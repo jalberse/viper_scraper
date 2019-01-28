@@ -8,7 +8,7 @@ try:
     if (os.path.isfile(".my_keys")):
         keys_file = open(".my_keys",'r')
     else: 
-        keys_file = open("keys",'r')
+        keys_file = open("keys.json",'r')
 except OSError as e:
     print("Error opening keys file")
 
