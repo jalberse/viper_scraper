@@ -1,3 +1,5 @@
 .python-version
 .my_keys
 .vscode/
+TODO.txt
+__pycache__
