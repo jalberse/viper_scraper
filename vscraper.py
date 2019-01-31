@@ -1,6 +1,6 @@
 import argparse
 import string
-import twitterscraper
+import twitter.twitterscraper
 
 parser = argparse.ArgumentParser(description="Scrape data from social media")
 
