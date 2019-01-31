@@ -2,7 +2,7 @@ import argparse
 import string
 import sys
 
-import twitter
+import twitter.scraper as tscraper
 
 parser = argparse.ArgumentParser(description="Scrape data from social media")
 
@@ -22,7 +22,6 @@ parser.add_argument('-l','--limit',nargs=1,metavar="Per-Node-Limit",
     help="The number of posts/images to extract per node before moving to neighbor")
 args = parser.parse_args()
 
-if (args.website=='twitter'):
+if (args.website[0]=='twitter'):
     if (args.data_type=='images'):
-        twitter.scraper.scrape(args.seed_user,images=True,text=False,number=args.number,
-            limit_per_node=args.limit_per_node)
+        tscraper.test()
