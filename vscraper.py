@@ -15,4 +15,7 @@ parser.add_argument('-t','--type',choices=['images','text','all'],
 parser.add_argument('-n','--number',type=int,nargs=1,default=1000,
     dest='num',metavar='Number',
     help="If data type is images, the number of images to scrape. Else the number of posts to scrape.")
+parser.add_argument('-l','--limit',nargs=1,metavar="Per-Node-Limit",
+    type=int,dest='limit_per_node',default=20,
+    help="The number of posts/images to extract per node before moving to neighbor")
 args = parser.parse_args()
