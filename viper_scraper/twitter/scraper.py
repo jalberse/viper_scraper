@@ -27,8 +27,7 @@ auth.set_access_token(access_token,access_token_secret)
 
 api = tweepy.API(auth)
 
-def test():
-    print('test')
-
 def scrape(seed_user,number=1000,limit_per_node=20):
-    print('test')
+    print("Seed user: " + seed_user)
+    print("Number to scrape: " + str(number))
+    print("Limit per node: " + str(limit_per_node))
