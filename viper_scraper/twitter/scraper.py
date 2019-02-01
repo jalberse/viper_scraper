@@ -7,11 +7,11 @@ import os.path
 ## set up OAuth from the keys file. 
 ## .my_keys (in .gitignore) file takes precedence over the keys file for easily maintaining private keys
 try:
-    ## TODO: Fix paths
-    if (os.path.isfile("../metadata/.my_keys")):
-        keys_file = open("../metadata/.my_keys",'r')
+    ## TODO: Fix paths for best practice compliance
+    if (os.path.isfile(".my_keys")):
+        keys_file = open(".my_keys",'r')
     else: 
-        keys_file = open("../metadata/keys.json",'r')
+        keys_file = open("metadata/keys.json",'r')
 except OSError as e:
     print("Error opening keys file")
 
@@ -30,5 +30,5 @@ api = tweepy.API(auth)
 def test():
     print('test')
 
-def scrape(seed_user,images=True,text=False,number=1000,limit_per_node=20):
+def scrape(seed_user,number=1000,limit_per_node=20):
     print('test')

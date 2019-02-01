@@ -14,7 +14,4 @@ setup(
    url="https://github.com/jalberse/viper_scraper",
    packages=['viper_scraper'],  #same as name
    install_requires=['tweepy'], #external packages as dependencies
-   scripts=[
-            'scripts/vscraper.py',
-           ]
 )
