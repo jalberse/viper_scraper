@@ -15,10 +15,12 @@ parser.add_argument('-n','--number',type=int,default=1000,
     help="If data type is images, the number of images to scrape. Else the number of posts to scrape.")
 parser.add_argument('-nl','--node_limit',metavar="Per-Node-Limit",
     type=int,dest='limit_per_node',default=20,
-    help="The number of posts/images to extract per node before moving to neighbor")
+    help="The number of posts/images to extract per node before moving to neighbor. Note: Decreasing "
+            " this number increases the time it takes to run, due to twitter rate limits on follower lists")
 parser.add_argument('-fl','--follower_limit',metavar="Neighbors-per-node",
     type=int,dest='limit_neighbors_per_node',default=-1,
-    help="The number of neigbors to visit per node. Visit all neighbors if not listed.")
+    help="The number of neigbors to visit per node. Visit all neighbors if not listed. Note: Decreasing"
+            " this number increases the time it takes to run, due to twitter rate limits on follower lists")
 args = parser.parse_args()
 
 if (args.website=='twitter'): 
