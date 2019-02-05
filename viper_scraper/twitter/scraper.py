@@ -51,6 +51,7 @@ def scrape(seed_user_screen_name,number=1000,limit_per_user=-1,limit_neighbors_p
     k = number # number of images remaining to scrape
 
     # Queue and set of IDs (not user objects)
+    # TODO: string IDs are preferred as "json can much the integer" - consider switching
     to_visit = queue.Queue()
     visited = set()
 
@@ -92,4 +93,4 @@ def scrape_user(user_id,limit,data_dir):
     limit -- the maximum number of images to scrape from this user. If -1, no limit
     data_dir -- the directory to save images to
     """
-    return 20 # TODO just testing
+    return 100 # TODO just testing
