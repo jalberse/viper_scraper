@@ -13,10 +13,15 @@ parser.add_argument('seed_user',
 parser.add_argument('-n','--number',type=int,default=1000,
     dest='number',metavar='Number',
     help="If data type is images, the number of images to scrape. Else the number of posts to scrape.")
-parser.add_argument('-l','--limit',metavar="Per-Node-Limit",
+parser.add_argument('-nl','--node_limit',metavar="Per-Node-Limit",
     type=int,dest='limit_per_node',default=20,
     help="The number of posts/images to extract per node before moving to neighbor")
+parser.add_argument('-fl','--follower_limit',metavar="Neighbors-per-node",
+    type=int,dest='limit_neighbors_per_node',default=-1,
+    help="The number of neigbors to visit per node. Visit all neighbors if not listed.")
 args = parser.parse_args()
 
 if (args.website=='twitter'): 
-    tscraper.scrape(seed_user=args.seed_user,number=args.number,limit_per_node=args.limit_per_node)
+    tscraper.scrape(seed_user_screen_name=args.seed_user,number=args.number,
+                    limit_per_user=args.limit_per_node,
+                    limit_neighbors_per_node=args.limit_neighbors_per_node)
