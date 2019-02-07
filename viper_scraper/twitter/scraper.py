@@ -68,7 +68,7 @@ def snowball_scrape(seed_user_screen_name,number=1000,limit_per_user=-1,limit_ne
         # Scrape this user and update number of images left
         if (DEBUG): print("Visiting: " + str(user_id))
 
-        k = k - scrape_user(user_id=user_id,limit=limit_per_user,data_dir=data_dir)
+        k = k - scrape_user_images(user_id=user_id,limit=limit_per_user,data_dir=data_dir)
 
         # Gather a list of follower/neighbor IDs
         if (DEBUG): print("Getting neighbors of " + str(user_id))
@@ -87,7 +87,7 @@ def snowball_scrape(seed_user_screen_name,number=1000,limit_per_user=-1,limit_ne
         print("Done visiting")
 
 
-def scrape_user(user_id,limit,data_dir):
+def scrape_user_images(user_id,limit,data_dir):
     """
     Scrape a single user for images. Gets all images.
     Returns the number of images scraped.
