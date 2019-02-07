@@ -23,6 +23,6 @@ parser.add_argument('-fl','--follower_limit',metavar="Neighbors-per-node",
 args = parser.parse_args()
 
 if (args.website=='twitter'): 
-    tscraper.scrape(seed_user_screen_name=args.seed_user,number=args.number,
+    tscraper.snowball_scrape(seed_user_screen_name=args.seed_user,number=args.number,
                     limit_per_user=args.limit_per_node,
                     limit_neighbors_per_node=args.limit_neighbors_per_node)
