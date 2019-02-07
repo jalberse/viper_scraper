@@ -111,14 +111,8 @@ def scrape_user(user_id,limit,data_dir):
             tweets = tweets + tweets_to_append
     
     # Collect a set of image URLs from the user
-    media_files = set()
-    for status in tweets:
-        media = status.entities.get('media',[])
-        if (len(media) > 0): # each status may have multiple
-            for i in range (0, len(media)):
-                if (media[i]['type'] == 'photo'):
-                    media_files.add(media[i]['media_url'])
-
+    media_files = get_media_urls(tweets,limit)
+        
     # Download the images
     n = 0 # num of images downloaded from user
     for media_file in media_files:
@@ -126,3 +120,16 @@ def scrape_user(user_id,limit,data_dir):
             os.path.join(data_dir,str(uuid.uuid4().hex) + ".jpg"))
         n = n + 1
     return n
+
+def get_media_urls(tweets,limit):
+    cnt = 0
+    media_files = set()
+    for status in tweets:
+        media = status.entities.get('media',[])
+        if (len(media) > 0): # each status may have multiple
+            for i in range (0, len(media)):
+                if (media[i]['type'] == 'photo'):
+                    media_files.add(media[i]['media_url'])
+                    cnt = cnt + 1
+                    if (limit != -1 and cnt >= limit): return media_files
+    return media_files
