@@ -4,6 +4,7 @@ import urllib.request
 import os.path
 import queue
 import uuid
+from random import randint
 
 DEBUG = 1
 
@@ -57,9 +58,8 @@ def snowball_scrape(seed_user_screen_name,number=1000,limit_per_user=-1,limit_ne
     # TODO: string IDs are preferred as "json can much the integer" - consider switching
     to_visit = queue.Queue()
     visited = set()
-
-    # Get seed user and enqueue its id
-    user = api.get_user(seed_user_screen_name)
+    
+    user = api.get_user(seed_user_screen_name)    
     to_visit.put(user.id)
     visited.add(user.id)
 
@@ -97,8 +97,20 @@ def scrape_user_images(user_id,limit,data_dir):
     data_dir -- the directory to save images to
     """
     if (DEBUG): print("Scraping user " + str(user_id))
+    
+    # Create directory to store user's data and images
+    user_dir = os.path.join(data_dir,str(user_id))
+    if not os.path.exists(user_dir):
+            os.makedirs(user_dir)
 
+    # Save user data
+    user = api.get_user(user_id)
+    f = open(os.path.join(user_dir,str(user_id) + ".json"),'w')
+    f.write(str(vars(user)))
+    f.close()
+    
     # Get all tweets from user
+    # TODO: Could improve speed by grabbing images inside this loop until hit max
     tweets = api.user_timeline(id=user_id,count=200)
     last_id = tweets[-1].id
     while (True):
@@ -117,7 +129,7 @@ def scrape_user_images(user_id,limit,data_dir):
     n = 0 # num of images downloaded from user
     for media_file in media_files:
         urllib.request.urlretrieve(media_file,
-            os.path.join(data_dir,str(uuid.uuid4().hex) + ".jpg"))
+            os.path.join(user_dir, str(user_id) + "_" + str(n) + ".jpg"))
         n = n + 1
     return n
 
