@@ -4,9 +4,9 @@ import sys
 
 from twitter import scraper as tscraper
 
-DEFAULT_NUMBER = 1000
-DEFAULT_PER_NODE_LIMIT = 20
-DEFAULT_FOLLOWER_LIMIT = -1
+DEFAULT_NUMBER = 2500
+DEFAULT_PER_NODE_LIMIT = 100
+DEFAULT_FOLLOWER_LIMIT = 10
 
 parser = argparse.ArgumentParser(description="Scrape data from social media",
                                 epilog="For snowball sampling, reducing per-node-limit and followers-per-node will " +
