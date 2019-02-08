@@ -73,10 +73,16 @@ def snowball_scrape(seed_user_screen_name,number=1000,limit_per_user=-1,limit_ne
         # Gather a list of follower/neighbor IDs
         if (DEBUG): print("Getting neighbors of " + str(user_id))
         follower_ids = []
-        for follower_id in tweepy.Cursor(api.followers_ids, id=user_id).items():
-            # Check if reached max neighbors to search, if applicable
-            if (limit_neighbors_per_node != -1 and len(follower_ids) == limit_neighbors_per_node): break
-            follower_ids.append(follower_id)
+        try:
+            # TODO: Can we avoid GET followers while queue is of sufficient length?
+            # May speed up scraping considerably.
+            for follower_id in tweepy.Cursor(api.followers_ids, id=user_id).items():
+                # Check if reached max neighbors to search, if applicable
+                if (limit_neighbors_per_node != -1 and len(follower_ids) == limit_neighbors_per_node): break
+                follower_ids.append(follower_id)
+        except tweepy.error.TweepError:
+            if (DEBUG): print("Private/suspended/deleted user " + str(user_id) + ", skipping")
+
         # BFS
         for u_id in follower_ids:
             if (u_id not in visited):
@@ -86,7 +92,7 @@ def snowball_scrape(seed_user_screen_name,number=1000,limit_per_user=-1,limit_ne
     if (DEBUG):
         print("Done visiting")
 
-
+# TODO: It may be desirable to associate saved images with JSON of status for later searching
 def scrape_user_images(user_id,limit,data_dir):
     """
     Scrape a single user for images. Gets all images.
@@ -105,6 +111,8 @@ def scrape_user_images(user_id,limit,data_dir):
     user_dir = os.path.join(data_dir,str(user_id))
     if not os.path.exists(user_dir):
             os.makedirs(user_dir)
+    else:
+        return 0 #already have user data
 
     # Save user data
     f = open(os.path.join(user_dir,str(user_id) + ".json"),'w')
@@ -132,9 +140,12 @@ def scrape_user_images(user_id,limit,data_dir):
     # Download the images
     n = 0 # num of images downloaded from user
     for media_file in media_files:
-        urllib.request.urlretrieve(media_file,
-            os.path.join(user_dir, str(user_id) + "_" + str(n) + ".jpg"))
-        n = n + 1
+        try:
+            urllib.request.urlretrieve(media_file,
+                os.path.join(user_dir, str(user_id) + "_" + str(n) + ".jpg"))
+            n = n + 1
+        except urllib.error.HTTPError:
+            if(DEBUG): print("HTTPError, skipping media")
     return n
 
 def get_media_urls(tweets,limit):
