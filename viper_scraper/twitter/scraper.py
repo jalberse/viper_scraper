@@ -63,31 +63,34 @@ def snowball_scrape(seed_user_screen_name,number=1000,limit_per_user=-1,limit_ne
     to_visit.put(user.id)
     visited.add(user.id)
 
-    while ((to_visit.empty() is not True) and (k > 0)):
+    while ((k > 0) and (to_visit.empty() is not True)):
         user_id = to_visit.get()
         # Scrape this user and update number of images left
         if (DEBUG): print("Visiting: " + str(user_id))
 
         k = k - scrape_user_images(user_id=user_id,limit=limit_per_user,data_dir=data_dir)
 
-        # Gather a list of follower/neighbor IDs
-        if (DEBUG): print("Getting neighbors of " + str(user_id))
-        follower_ids = []
-        try:
-            # TODO: Can we avoid GET followers while queue is of sufficient length?
-            # May speed up scraping considerably.
-            for follower_id in tweepy.Cursor(api.followers_ids, id=user_id).items():
-                # Check if reached max neighbors to search, if applicable
-                if (limit_neighbors_per_node != -1 and len(follower_ids) == limit_neighbors_per_node): break
-                follower_ids.append(follower_id)
-        except tweepy.error.TweepError:
-            if (DEBUG): print("Private/suspended/deleted user " + str(user_id) + ", skipping")
+        # Mark new nodes to visit iff to_visit queue is sufficiently small
+        # This reduces GET followers calls, which are severely rate limited
+        if (to_visit.qsize() < 10):
+            # Gather a list of follower/neighbor IDs
+            if (DEBUG): print("Queue low, getting neighbors of " + str(user_id))
+            follower_ids = []
+            try:
+                # TODO: Can we avoid GET followers while queue is of sufficient length?
+                # May speed up scraping considerably.
+                for follower_id in tweepy.Cursor(api.followers_ids, id=user_id).items():
+                    # Check if reached max neighbors to search, if applicable
+                    if (len(follower_ids) == limit_neighbors_per_node): break
+                    follower_ids.append(follower_id)
+            except tweepy.error.TweepError:
+                if (DEBUG): print("Private/suspended/deleted user " + str(user_id) + ", skipping")
 
-        # BFS
-        for u_id in follower_ids:
-            if (u_id not in visited):
-                to_visit.put(u_id)
-                visited.add(u_id)
+            # BFS
+            for u_id in follower_ids:
+                if (u_id not in visited):
+                    to_visit.put(u_id)
+                    visited.add(u_id)
     
     if (DEBUG):
         print("Done visiting")
@@ -95,7 +98,9 @@ def snowball_scrape(seed_user_screen_name,number=1000,limit_per_user=-1,limit_ne
 # TODO: It may be desirable to associate saved images with JSON of status for later searching
 def scrape_user_images(user_id,limit,data_dir):
     """
-    Scrape a single user for images. Gets all images.
+    Scrape a single user for images. 
+    Places all images in data_dir/user_id/ along with
+    JSON of user object.
     Returns the number of images scraped.
 
     user -- the twitter user object to scrape
