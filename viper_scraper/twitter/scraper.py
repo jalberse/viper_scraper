@@ -38,9 +38,9 @@ def snowball_scrape(seed_user_screen_name,number=1000,limit_per_user=-1,limit_ne
     Scrape twitter for images. 
     Uses snowball sampling to extract limit_per_node images
     from each user, visiting limit_num_neighbors per user
-    until number images have been downloaded
+    until number images have been downloaded.
 
-    If a parameter is -1, there is not limit
+    If a parameter is -1, there is not limit.
 
     seed_user -- the user from which the crawl originates
     limt_per_node -- the number of images to scrape per user
