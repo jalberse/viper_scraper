@@ -42,6 +42,7 @@ def main():
     if args.website == 'twitter':
         start_time = time.time()
         tscraper.stream_scrape(args.number)
+        #tscraper.snowball_scrape('@johnalberse', number=1000, limit_per_user=-1, limit_neighbors_per_node=20)
         elapsed_time = time.time() - start_time
         print("Time elapsed: " + str(elapsed_time))
 

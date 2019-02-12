@@ -17,3 +17,26 @@ learners permit
 drivers license
 id
 badge
+card
+social security
+new job
+taxes
+bank account
+checking account
+savings account
+paycheck
+money order
+money
+wallet
+ticket
+plane ticket
+train ticket
+boarding pass
+keyring
+new apartment
+new condo
+apartment
+condo
+baby boy
+baby girl
+baby
