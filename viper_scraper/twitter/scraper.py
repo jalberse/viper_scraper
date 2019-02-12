@@ -58,7 +58,6 @@ class MyStreamListener(tweepy.StreamListener):
         try:
             ## TODO: We got an error somewhere in here
             with open('./data/data.csv', 'a+') as f:
-                print(self.cnt)
                 writer = csv.writer(f)
                 media_urls, k = get_media_urls(status)
                 # retrieve and save each
@@ -67,6 +66,7 @@ class MyStreamListener(tweepy.StreamListener):
                     try:
                         urllib.request.urlretrieve(url, filename)
                         self.cnt = self.cnt + 1
+                        print("Downloading image " + str(self.cnt))
                     except urllib.error.HTTPError:
                         print("HTTPError, skipping media")
 
