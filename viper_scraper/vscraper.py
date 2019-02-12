@@ -1,6 +1,7 @@
 import argparse
 import string
 import sys
+import time
 
 from twitter import scraper as tscraper
 
@@ -29,7 +30,10 @@ parser.add_argument('-fl','--follower_limit',metavar="Followers-Per-Node",
     help="For snowball sampling, the number of neigbors to visit per node. Visit all neighbors if not listed.")
 args = parser.parse_args()
 
-if (args.website=='twitter'): 
+if (args.website=='twitter'):
+    start_time = time.time()
     tscraper.snowball_scrape(seed_user_screen_name=args.seed_user,number=args.number,
                     limit_per_user=args.limit_per_node,
                     limit_neighbors_per_node=args.limit_followers_per_node)
+    elapsed_time = time.time()
+    print("Time elapsed: " + str(elapsed_time))
