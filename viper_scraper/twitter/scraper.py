@@ -1,6 +1,7 @@
 import tweepy
 import json
 import urllib.request
+import csv
 import os.path
 import queue
 import uuid
@@ -10,6 +11,9 @@ DEBUG = 1
 
 ## set up OAuth from the keys file.
 ## .my_keys (in .gitignore) file takes precedence over the keys file for easily maintaining private keys
+
+## TODO: Set up mySQL database rather than saving to a csv
+## TODO: log errors don't print them
 
 def get_api():
     """
@@ -37,6 +41,86 @@ def get_api():
     return tweepy.API(auth_handler=auth, wait_on_rate_limit=True,
                       wait_on_rate_limit_notify=True)
 
+
+class MyStreamListener(tweepy.StreamListener):
+    """
+    Listen for data
+    """
+    def __init__(self, api=None, limit=1000):
+        super().__init__(api)
+        self.limit = limit
+        self.cnt = 0
+
+    def on_status(self, status):
+        if self.cnt >= self.limit:
+            print("limit reached, exiting")
+            return False # we have reached the number of images to scrape
+        try:
+            ## TODO: We got an error somewhere in here
+            with open('./data/data.csv', 'a+') as f:
+                print(self.cnt)
+                writer = csv.writer(f)
+                media_urls, k = get_media_urls(status)
+                # retrieve and save each
+                for url in media_urls:
+                    filename = os.path.join('./data/images/', uuid.uuid4().hex)
+                    try:
+                        urllib.request.urlretrieve(url, filename)
+                        self.cnt = self.cnt + 1
+                    except urllib.error.HTTPError:
+                        print("HTTPError, skipping media")
+
+                    writer.writerow([status.user.id_str, status.id_str,
+                                     filename])
+        except OSError:
+            print(str(OSError))
+            return False
+        return True
+
+    def on_error(self, status_code):
+        if status_code == 420:
+            #returning False in on_data disconnects the stream
+            return False
+        return False
+
+def stream_scrape(number=1000):
+    """
+    Scrape number images from tweets using the tweepy streaming API
+
+    Tweets are filtered using /metadata/tracking.txt
+    """
+    api = get_api()
+
+    data_dir = ("data/")
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    images_dir = ("data/images/")
+    if not os.path.exists(images_dir):
+        os.makedirs(images_dir)
+
+    try:
+        with open("metadata/tracking.txt", 'r') as f:
+            tracking = f.read().splitlines()
+    except OSError:
+        print("Error opening tracking.txt")
+        return
+
+    # CSV file
+    try:
+        filename = './data/data.csv'
+        with open(filename, 'a+') as f:
+            writer = csv.writer(f)
+            if os.path.getsize(filename) == 0:
+                writer.writerow(['user_id', 'tweet_id', 'imagefile'])
+    except OSError:
+        print("Could not create data.csv")
+
+    stream_listener = MyStreamListener(limit=number)
+    stream = tweepy.Stream(auth=api.auth, listener=stream_listener,
+                           tweet_mode='extended', stall_warnings=True)
+    stream.filter(track=tracking) # To unblock, asynch = True
+
 def snowball_scrape(seed_user_screen_name, number=1000, limit_per_user=-1, limit_neighbors_per_node=-1):
     """
     Scrape twitter for images.
@@ -56,6 +140,10 @@ def snowball_scrape(seed_user_screen_name, number=1000, limit_per_user=-1, limit
     data_dir = ("data/")
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
+
+    images_dir = ("data/images/")
+    if not os.path.exists(images_dir):
+        os.makedirs(images_dir)
 
     k = number # number of images remaining to scrape
 
@@ -153,7 +241,7 @@ def scrape_user_images(user_id, limit, data_dir, api):
             tweets = tweets + tweets_to_append
 
     # Collect a set of image URLs from the user
-    media_files = get_media_urls(tweets, limit)
+    media_files = get_media_urls_from_tweet_list(tweets, limit)
 
     # Download the images
     n = 0 # num of images downloaded from user
@@ -169,16 +257,29 @@ def scrape_user_images(user_id, limit, data_dir, api):
                 print("HTTPError, skipping media")
     return n
 
-def get_media_urls(tweets, limit):
+def get_media_urls(tweet):
+    """
+    Returns the set of media urls for a given tweet
+    """
+    media_urls = set()
+    media = tweet.entities.get('media', [])
     cnt = 0
-    media_files = set()
-    for status in tweets:
-        media = status.entities.get('media', [])
-        if len(media) > 0: # each status may have multiple
-            for i in range(0, len(media)):
-                if media[i]['type'] == 'photo':
-                    media_files.add(media[i]['media_url'])
-                    cnt = cnt + 1
-                    if (limit != -1 and cnt >= limit):
-                        return media_files
-    return media_files
+    if len(media) > 0:
+        for i in range(0, len(media)):
+            if media[i]['type'] == 'photo':
+                media_urls.add(media[i]['media_url'])
+                cnt = cnt + 1
+    return media_urls, cnt
+
+def get_media_urls_from_tweet_list(tweets, limit):
+    k = 0
+    media_urls = set()
+    cnt = 0 # vars for each tweet
+    us = set()
+    for tweet in tweets:
+        us, cnt = get_media_urls(tweet)
+        media_urls = media_urls.union(us)
+        k = k + cnt
+        if k >= limit:
+            return media_urls
+    return media_urls
