@@ -92,7 +92,7 @@ class MyStreamListener(tweepy.StreamListener):
             return False
         return False
 
-def stream_scrape(number=1000):
+def stream_scrape(tracking_file,number=1000):
     """
     Scrape number images from tweets using the tweepy streaming API
 
@@ -109,7 +109,7 @@ def stream_scrape(number=1000):
         os.makedirs(images_dir)
 
     try:
-        with open("metadata/tracking.txt", 'r') as f:
+        with open(tracking_file, 'r') as f:
             tracking = f.read().splitlines()
     except OSError:
         print("Error opening tracking.txt")
