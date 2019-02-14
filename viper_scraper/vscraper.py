@@ -34,6 +34,10 @@ def argument_parsing():
                         dest='number', metavar='Number',
                         help="If data type is images, the number of images to "
                         + "scrape. Else the number of posts to scrape.")
+    parser.add_argument('-t', '--tracking', dest='tracking_file', metavar='Tracking File',
+                        default='metadata/tracking.txt',
+                        help="(Twitter) A file containing a list of phrases, one per line, to track." +
+                        " see https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html")
     return parser.parse_args()
 
 def main():
@@ -41,7 +45,7 @@ def main():
 
     if args.website == 'twitter':
         start_time = time.time()
-        tscraper.stream_scrape(args.number)
+        tscraper.stream_scrape(args.tracking_file,args.number)
         #tscraper.snowball_scrape('@johnalberse', number=1000, limit_per_user=-1, limit_neighbors_per_node=20)
         elapsed_time = time.time() - start_time
         print("Time elapsed: " + str(elapsed_time))
