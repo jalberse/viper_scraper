@@ -55,6 +55,8 @@ class MyStreamListener(tweepy.StreamListener):
         if self.cnt >= self.limit:
             print("limit reached, exiting")
             return False # we have reached the number of images to scrape
+        if status.text.startswith('RT'):
+            return True # Ignore RTs to avoid repeat data
         try:
             ## TODO: We got an error somewhere in here
             with open('./data/data.csv', 'a+') as f:
@@ -66,7 +68,11 @@ class MyStreamListener(tweepy.StreamListener):
                     try:
                         urllib.request.urlretrieve(url, filename)
                         self.cnt = self.cnt + 1
-                        print("Downloading image " + str(self.cnt))
+                        if DEBUG:
+                            print("Downloading image " + str(self.cnt))
+                            print ("from url " + url)
+                            print("from tweet https://twitter.com/statuses/" + status.id_str)
+                            print("from user https://twitter.com/intent/user?user_id=" + status.user.id_str)
                     except urllib.error.HTTPError:
                         print("HTTPError, skipping media")
 
@@ -277,5 +283,6 @@ def get_media_urls_from_list(tweets,limit):
                 if (media[i]['type'] == 'photo'):
                     media_files.add(media[i]['media_url'])
                     cnt = cnt + 1
+                    print (len(media_files))
                     if (limit != -1 and cnt >= limit): return media_files
     return media_files
