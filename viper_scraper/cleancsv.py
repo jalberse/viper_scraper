@@ -1,14 +1,28 @@
 import os
 import csv
+import argparse
 
 DEBUG = 1
+
+def argument_parsing():
+    """
+    Parse the arguments
+
+    Returns args
+    """
+
+    parser = argparse.ArgumentParser(description="Removes rows of csv which reference a non-existant file")
+    parser.add_argument('file', help='The CSV to clean')
+    return parser.parse_args()
 
 def clean_csv():
     """
     Removes rows of csv which reference a file which no longer exists
     """
+    args = argument_parsing()
+
     try:
-        with open ('./data/data.csv', 'r') as f, open ('./data/data_tmp.csv', 'w') as out:
+        with open (args.file, 'r') as f, open ('temp.csv', 'w') as out:
             writer = csv.writer(out)
             reader = csv.reader(f)
             next (reader,None)
@@ -17,7 +31,7 @@ def clean_csv():
                     writer.writerow(row) # only write rows with existing files
                 else:
                     if DEBUG: print ('deleting references to file ' + row[2])
-        os.rename('./data/data_tmp.csv','./data/data.csv')
+        os.rename('tmp.csv',args.file)
     except OSError:
         print(OSError)
 

@@ -2,12 +2,11 @@ import argparse
 import string
 import sys
 import time
+from datetime import datetime
 
 from viper_scraper.twitter import scraper as tscraper
 
 DEFAULT_NUMBER = 2500
-DEFAULT_PER_NODE_LIMIT = 100
-DEFAULT_FOLLOWER_LIMIT = 10
 
 """
 parser.add_argument('-nl','--node_limit',metavar="Per-Node-Limit",
@@ -27,6 +26,8 @@ def argument_parsing():
     Returns args
     """
 
+    now = datetime.now()
+
     parser = argparse.ArgumentParser(description="Scrape data from social media")
     parser.add_argument('website', choices=['twitter', 'instagram'],
                         help='The website to crawl for data')
@@ -38,6 +39,9 @@ def argument_parsing():
                         default='metadata/tracking.txt',
                         help="(Twitter) A file containing a list of phrases, one per line, to track." +
                         " see https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html")
+    parser.add_argument('-d','--dir',dest='data_directory',metavar="Data Directory",
+                        default='./data' + now.strftime('%Y%m%d%H%M%S'),
+                        help="The folder to download data to. Default ./dataYYYYMMDDHHMMSS/")
     return parser.parse_args()
 
 def main():
@@ -45,7 +49,7 @@ def main():
 
     if args.website == 'twitter':
         start_time = time.time()
-        tscraper.stream_scrape(args.tracking_file,args.number)
+        tscraper.stream_scrape(tracking_file=args.tracking_file,directory=args.data_directory,number=args.number)
         #tscraper.snowball_scrape('@johnalberse', number=1000, limit_per_user=-1, limit_neighbors_per_node=20)
         elapsed_time = time.time() - start_time
         print("Time elapsed: " + str(elapsed_time))
