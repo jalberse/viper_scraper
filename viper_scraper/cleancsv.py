@@ -22,17 +22,26 @@ def clean_csv():
     args = argument_parsing()
 
     try:
-        with open (args.file, 'r') as f, open ('temp.csv', 'w') as out:
+        infilename = args.file
+        tempfilename = os.path.join(os.path.dirname(args.file),'temp.csv')
+        if DEBUG: print('cleaning ' + infilename + ' to tmp file ' + tempfilename)
+        with open (infilename, 'r') as f, open (tempfilename, 'w') as out:
             writer = csv.writer(out)
             reader = csv.reader(f)
             next (reader,None)
             for row in reader:
-                if os.path.exists(row[2]):
+                if os.path.exists(os.path.join(os.path.dirname(args.file),row[2])):
                     writer.writerow(row) # only write rows with existing files
                 else:
                     if DEBUG: print ('deleting references to file ' + row[2])
-        os.rename('tmp.csv',args.file)
     except OSError:
+        print(OSError)
+
+    try:
+        if DEBUG: print('renaming ' + tempfilename + ' to ' + infilename)
+        os.rename(tempfilename,infilename)
+    except OSError:
+        print('Error renaming file')
         print(OSError)
 
 
