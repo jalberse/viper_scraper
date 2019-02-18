@@ -10,7 +10,9 @@ def clean_csv():
     try:
         with open ('./data/data.csv', 'r') as f, open ('./data/data_tmp.csv', 'w') as out:
             writer = csv.writer(out)
-            for row in csv.reader(f):
+            reader = csv.reader(f)
+            next (reader,None)
+            for row in reader:
                 if os.path.exists(row[2]):
                     writer.writerow(row) # only write rows with existing files
                 else:
