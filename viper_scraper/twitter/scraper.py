@@ -46,8 +46,9 @@ class MyStreamListener(tweepy.StreamListener):
     """
     Listen for data
     """
-    def __init__(self, api=None, limit=1000):
+    def __init__(self, directory, api=None, limit=1000):
         super().__init__(api)
+        self.directory = directory
         self.limit = limit
         self.cnt = 0
 
@@ -59,12 +60,13 @@ class MyStreamListener(tweepy.StreamListener):
             return True # Ignore RTs to avoid repeat data
         try:
             ## TODO: We got an error somewhere in here
-            with open('./data/data.csv', 'a+') as f:
+            with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
                 writer = csv.writer(f)
                 media_urls, k = get_media_urls(status)
                 # retrieve and save each
                 for url in media_urls:
-                    filename = os.path.join('./data/images/', uuid.uuid4().hex)
+                    local_filename = uuid.uuid4().hex
+                    filename = os.path.join(self.directory,'data/images/', local_filename)
                     try:
                         urllib.request.urlretrieve(url, filename)
                         self.cnt = self.cnt + 1
@@ -79,8 +81,9 @@ class MyStreamListener(tweepy.StreamListener):
                     # TODO: Check here for adult content/not a real-life photo
                     # Need to do more research on how (CNN likely)
 
+                    # CSV contains file location relative to CSV
                     writer.writerow([status.user.id_str, status.id_str,
-                                     filename])
+                                     os.path.join('./data/images/',local_filename)])
         except OSError:
             print(str(OSError))
             return False
@@ -92,7 +95,7 @@ class MyStreamListener(tweepy.StreamListener):
             return False
         return False
 
-def stream_scrape(tracking_file,number=1000):
+def stream_scrape(tracking_file,directory,number=1000,):
     """
     Scrape number images from tweets using the tweepy streaming API
 
@@ -100,11 +103,14 @@ def stream_scrape(tracking_file,number=1000):
     """
     api = get_api()
 
-    data_dir = ("data/")
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+    data_dir = os.path.join(directory,'./data/')
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
-    images_dir = ("data/images/")
+    images_dir = os.path.join(directory,'./data/images/')
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
 
@@ -117,7 +123,7 @@ def stream_scrape(tracking_file,number=1000):
 
     # CSV file
     try:
-        filename = './data/data.csv'
+        filename = os.path.join(directory,'data.csv')
         with open(filename, 'a+') as f:
             writer = csv.writer(f)
             if os.path.getsize(filename) == 0:
@@ -125,13 +131,15 @@ def stream_scrape(tracking_file,number=1000):
     except OSError:
         print("Could not create data.csv")
 
-    stream_listener = MyStreamListener(limit=number)
+    stream_listener = MyStreamListener(directory=directory,limit=number)
     stream = tweepy.Stream(auth=api.auth, listener=stream_listener,
                            tweet_mode='extended', stall_warnings=True)
     stream.filter(track=tracking) # To unblock, asynch = True
 
 def snowball_scrape(seed_user_screen_name, number=1000, limit_per_user=-1, limit_neighbors_per_node=-1):
     """
+    DEPRECATED - need to update this method if want to use
+
     Scrape twitter for images.
     Uses snowball sampling to extract limit_per_node images
     from each user, visiting limit_num_neighbors per user
