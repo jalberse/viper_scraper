@@ -3,7 +3,7 @@ import string
 import sys
 import time
 
-from twitter import scraper as tscraper
+from viper_scraper.twitter import scraper as tscraper
 
 DEFAULT_NUMBER = 2500
 DEFAULT_PER_NODE_LIMIT = 100
