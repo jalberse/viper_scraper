@@ -7,6 +7,8 @@ new whip
 keys
 lock and key
 lock key
+bike lock
+bycicle lock
 house key
 new apartment
 passport
@@ -23,7 +25,11 @@ pay stub
 paystub
 checkbook
 bank account
+checking account
+savings account
 travel
+travelling
+immigrating
 address
 email address
 license plate
@@ -39,4 +45,9 @@ master card
 gift card
 gift cards
 credit cards
-
+receipt
+abroad
+moving abroad
+travelling abroad
+international flight
+across the pond
