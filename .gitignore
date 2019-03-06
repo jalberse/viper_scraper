@@ -5,3 +5,20 @@ data*/
 .vscode/
 TODO.txt
 __pycache__
+
+# Default data directory
+data
+
+# prevent terrible mistakes
+auth.json
+
+# driver logs
+geckodriver.log
+ghostdriver.log
+
+#debugging files
+page
+
+# large files user should install
+geckodriver*
+phantomjs*
