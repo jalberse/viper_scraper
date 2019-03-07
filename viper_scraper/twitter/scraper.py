@@ -66,7 +66,7 @@ class MyStreamListener(tweepy.StreamListener):
                 # retrieve and save each
                 for url in media_urls:
                     local_filename = uuid.uuid4().hex
-                    filename = os.path.join(self.directory,'data/images/', local_filename)
+                    filename = os.path.join(self.directory,'data/images/', local_filename + ".jpg")
                     try:
                         urllib.request.urlretrieve(url, filename)
                         self.cnt = self.cnt + 1
@@ -83,7 +83,7 @@ class MyStreamListener(tweepy.StreamListener):
 
                     # CSV contains file location relative to CSV
                     writer.writerow([status.user.id_str, status.id_str,
-                                     os.path.join('./data/images/',local_filename)])
+                                     filename])
         except OSError:
             print(str(OSError))
             return False

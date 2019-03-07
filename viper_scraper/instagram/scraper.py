@@ -36,6 +36,8 @@ import os
 import re
 import sys
 import time
+import csv
+import uuid
 from bs4 import BeautifulSoup
 try:
     from urlparse import urljoin
@@ -171,72 +173,6 @@ class InstagramCrawler(object):
         print("Quitting driver...")
         self.quit()
 
-    def browse_target_page(self, query):
-        # Browse Hashtags
-        if query.startswith('#'):
-            relative_url = urljoin('explore/tags/', query.strip('#'))
-        else:  # Browse user page
-            relative_url = query
-
-        target_url = urljoin(HOST, relative_url)
-
-        self._driver.get(target_url)
-
-    def scroll_to_num_of_posts(self, number):
-        # Get total number of posts on page
-
-        num_info = re.search(r'edge_hashtag_to_media":{"count":\d+|edge_owner_to_timeline_media":{"count":\d+',
-                             self._driver.page_source).group()
-        num_of_posts = int(re.findall(r'\d+', num_info)[0])
-        print("posts: {}, number: {}".format(num_of_posts, number))
-        number = number if number < num_of_posts else num_of_posts
-
-        # scroll page until reached
-        # Uncomment if instagram reimplements a "load more" button
-        """
-        loadmore = WebDriverWait(self._driver, 10).until(
-            EC.presence_of_element_located(
-                (By.CSS_SELECTOR, CSS_LOAD_MORE))
-        )
-        loadmore.click()
-        """
-
-        num_to_scroll = int((number - 12) / 12) + 1
-        for _ in range(num_to_scroll):
-            self._driver.execute_script(SCROLL_DOWN)
-            time.sleep(0.2)
-            self._driver.execute_script(SCROLL_UP)
-            time.sleep(0.2)
-
-    def scrape_photo_links(self, number, is_hashtag=False):
-        """
-        DEPRECATED
-
-        Photo links are now collected concurrently with captions. 
-        Only 33 links are stored on main profile page now, so
-        it is safer to grab from each post
-        """
-        print("Scraping photo links...")
-        
-        soup = BeautifulSoup(self._driver.page_source)
-
-        article_soup = soup.find("article")
-        soup_string = str(article_soup)
-        # TODO: HTML is not a regular language. Regex can not capture the complexity of the HTML DOM.
-        # because HTML is not a regular language. Regex is insufficiently powerful to parse the HTML DOM.
-        # Because HTML is not a regular language.
-        # What I'm trying to say is this URL should be obtained in a more direct way.
-        encased_photo_links = re.finditer(r'src="([https]+:...[\/\w \.-]*..[\/\w \.-]*'
-                                          r'..[\/\w \.-]*..[\/\w \.-].jpg\?[\/\w \.-]*..[\/\w \.-]*.net)', soup_string)
-
-        photo_links = [m.group(1) for m in encased_photo_links]
-
-        print("Number of photo_links: {}".format(len(photo_links)))
-
-        begin = 0 if is_hashtag else 0
-
-        self.data['photo_links'] = photo_links[begin:number + begin]
-
     def click_and_scrape_photos_and_captions(self, number, query):
         print("Scraping photos and captions...")
         captions = []
@@ -306,6 +242,134 @@ class InstagramCrawler(object):
         self.data['captions'] = captions
         self.data['photo_links'] = photo_links
 
+    def download_and_save(self, dir_prefix, query, crawl_type):
+        # Check if is hashtag
+        dir_name = query.lstrip(
+            '#') + '.hashtag' if query.startswith('#') else query
+
+        dir_path = os.path.join(dir_prefix, dir_name)
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+
+        print("Saving to directory: {}".format(dir_path))
+
+        data_dir = os.path.join(dir_path,'data/')
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+
+        images_dir = os.path.join(dir_path,'data/images/')
+        if not os.path.exists(images_dir):
+            os.makedirs(images_dir)
+
+        with open(os.path.join(dir_path,"data.csv"),'a+') as f:
+            writer = csv.writer(f)
+            if os.path.getsize(os.path.join(dir_path,"data.csv")) == 0:
+                writer.writerow(['imagefile', 'caption'])
+            for photo_link, caption in zip(self.data['photo_links'], self.data['captions']):
+                # Save photo
+                sys.stdout.write("\033[F")
+                # Filename
+                local_filename = uuid.uuid4().hex + ".jpg"
+                filepath = os.path.join(images_dir, local_filename)
+                # Download image
+                urlretrieve(photo_link, filepath)
+
+                # write to csv
+                writer.writerow([filepath,caption])
+                
+        '''
+        for idx, photo_link in enumerate(self.data['photo_links'], 0):
+            sys.stdout.write("\033[F")
+            # Filename
+            filename = str(idx) + ".jpg"
+            filepath = os.path.join(images_dir, filename)
+            # Download image
+            urlretrieve(photo_link, filepath)
+
+        # Save Captions
+        for idx, caption in enumerate(self.data['captions'], 0):
+
+            filename = str(idx) + '.txt'
+            filepath = os.path.join(dir_path, filename)
+
+            with codecs.open(filepath, 'w', encoding='utf-8') as fout:
+                fout.write(caption + '\n')
+
+        # Save followers/following
+        filename = crawl_type + '.txt'
+        filepath = os.path.join(dir_path, filename)
+        if len(self.data[crawl_type]):
+            with codecs.open(filepath, 'w', encoding='utf-8') as fout:
+                for fol in self.data[crawl_type]:
+                    fout.write(fol + '\n')
+        '''
+
+    def browse_target_page(self, query):
+        # Browse Hashtags
+        if query.startswith('#'):
+            relative_url = urljoin('explore/tags/', query.strip('#'))
+        else:  # Browse user page
+            relative_url = query
+
+        target_url = urljoin(HOST, relative_url)
+
+        self._driver.get(target_url)
+
+    def scroll_to_num_of_posts(self, number):
+        # Get total number of posts on page
+
+        num_info = re.search(r'edge_hashtag_to_media":{"count":\d+|edge_owner_to_timeline_media":{"count":\d+',
+                             self._driver.page_source).group()
+        num_of_posts = int(re.findall(r'\d+', num_info)[0])
+        print("posts: {}, number: {}".format(num_of_posts, number))
+        number = number if number < num_of_posts else num_of_posts
+
+        # scroll page until reached
+        # Uncomment if instagram reimplements a "load more" button
+        """
+        loadmore = WebDriverWait(self._driver, 10).until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, CSS_LOAD_MORE))
+        )
+        loadmore.click()
+        """
+
+        num_to_scroll = int((number - 12) / 12) + 1
+        for _ in range(num_to_scroll):
+            self._driver.execute_script(SCROLL_DOWN)
+            time.sleep(0.2)
+            self._driver.execute_script(SCROLL_UP)
+            time.sleep(0.2)
+
+    def scrape_photo_links(self, number, is_hashtag=False):
+        """
+        DEPRECATED
+
+        Photo links are now collected concurrently with captions. 
+        Only 33 links are stored on main profile page now, so
+        it is safer to grab from each post
+        """
+        print("Scraping photo links...")
+        
+        soup = BeautifulSoup(self._driver.page_source)
+
+        article_soup = soup.find("article")
+        soup_string = str(article_soup)
+        # TODO: HTML is not a regular language. Regex can not capture the complexity of the HTML DOM.
+        # because HTML is not a regular language. Regex is insufficiently powerful to parse the HTML DOM.
+        # Because HTML is not a regular language.
+        # What I'm trying to say is this URL should be obtained in a more direct way.
+        encased_photo_links = re.finditer(r'src="([https]+:...[\/\w \.-]*..[\/\w \.-]*'
+                                          r'..[\/\w \.-]*..[\/\w \.-].jpg\?[\/\w \.-]*..[\/\w \.-]*.net)', soup_string)
+
+        photo_links = [m.group(1) for m in encased_photo_links]
+
+        print("Number of photo_links: {}".format(len(photo_links)))
+
+        begin = 0 if is_hashtag else 0
+
+        self.data['photo_links'] = photo_links[begin:number + begin]
+
     def scrape_followers_or_following(self, crawl_type, query, number):
         print("Scraping {}...".format(crawl_type))
         if crawl_type == "followers":
@@ -353,44 +417,7 @@ class InstagramCrawler(object):
 
         self.data[crawl_type] = follow_items
 
-    def download_and_save(self, dir_prefix, query, crawl_type):
-        # Check if is hashtag
-        dir_name = query.lstrip(
-            '#') + '.hashtag' if query.startswith('#') else query
-
-        dir_path = os.path.join(dir_prefix, dir_name)
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
-
-        print("Saving to directory: {}".format(dir_path))
-
-        # Save Photos
-        for idx, photo_link in enumerate(self.data['photo_links'], 0):
-            sys.stdout.write("\033[F")
-            # Filename
-            _, ext = os.path.splitext(photo_link)
-            filename = str(idx) + ext
-            filepath = os.path.join(dir_path, filename)
-            print('file path ' + filepath)
-            # Download image
-            urlretrieve(photo_link, filepath)
-
-        # Save Captions
-        for idx, caption in enumerate(self.data['captions'], 0):
-
-            filename = str(idx) + '.txt'
-            filepath = os.path.join(dir_path, filename)
-
-            with codecs.open(filepath, 'w', encoding='utf-8') as fout:
-                fout.write(caption + '\n')
-
-        # Save followers/following
-        filename = crawl_type + '.txt'
-        filepath = os.path.join(dir_path, filename)
-        if len(self.data[crawl_type]):
-            with codecs.open(filepath, 'w', encoding='utf-8') as fout:
-                for fol in self.data[crawl_type]:
-                    fout.write(fol + '\n')
+    
 
 
 def main():
