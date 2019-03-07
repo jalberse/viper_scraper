@@ -60,7 +60,6 @@ def main():
     args.func(args)
 
 def instagram(args):
-    print("parsing insta")
     crawler = iscraper.InstagramCrawler(headless=args.headless, firefox_path=args.firefox_path)
     crawler.crawl(dir_prefix=args.dir_prefix,
                   query=args.query,
@@ -70,7 +69,6 @@ def instagram(args):
                   authentication=args.authentication)
 
 def twitter(args):
-    print("parsing twitter")
     tscraper.stream_scrape(tracking_file=args.tracking_file,directory=args.data_directory,number=args.number)
 
 if __name__ == "__main__":
