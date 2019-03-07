@@ -149,7 +149,13 @@ class InstagramCrawler(object):
             self.browse_target_page(query)
             # Scrape captions if specified
             self.click_and_scrape_photos_and_captions(number,query)
-
+        else:
+            print("Unknown crawl type: {}".format(crawl_type))
+            self.quit()
+            return
+            
+        # TODO: This crawl type must be fixed before using
+        '''
         elif crawl_type in ["followers", "following"]:
             # Need to login first before crawling followers/following
             print("You will need to login to crawl {}".format(crawl_type))
@@ -161,10 +167,8 @@ class InstagramCrawler(object):
             self.browse_target_page(query)
             # Scrape captions
             self.scrape_followers_or_following(crawl_type, query, number)
-        else:
-            print("Unknown crawl type: {}".format(crawl_type))
-            self.quit()
-            return
+        '''
+        
         # Save to directory
         print("Saving...")
         self.download_and_save(dir_prefix, query, crawl_type)
@@ -276,33 +280,6 @@ class InstagramCrawler(object):
 
                 # write to csv
                 writer.writerow([filepath,caption])
-                
-        '''
-        for idx, photo_link in enumerate(self.data['photo_links'], 0):
-            sys.stdout.write("\033[F")
-            # Filename
-            filename = str(idx) + ".jpg"
-            filepath = os.path.join(images_dir, filename)
-            # Download image
-            urlretrieve(photo_link, filepath)
-
-        # Save Captions
-        for idx, caption in enumerate(self.data['captions'], 0):
-
-            filename = str(idx) + '.txt'
-            filepath = os.path.join(dir_path, filename)
-
-            with codecs.open(filepath, 'w', encoding='utf-8') as fout:
-                fout.write(caption + '\n')
-
-        # Save followers/following
-        filename = crawl_type + '.txt'
-        filepath = os.path.join(dir_path, filename)
-        if len(self.data[crawl_type]):
-            with codecs.open(filepath, 'w', encoding='utf-8') as fout:
-                for fol in self.data[crawl_type]:
-                    fout.write(fol + '\n')
-        '''
 
     def browse_target_page(self, query):
         # Browse Hashtags
