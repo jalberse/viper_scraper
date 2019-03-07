@@ -149,14 +149,10 @@ class InstagramCrawler(object):
             self.browse_target_page(query)
             # Scrape captions if specified
             self.click_and_scrape_photos_and_captions(number,query)
-        else:
-            print("Unknown crawl type: {}".format(crawl_type))
-            self.quit()
-            return
-            
-        # TODO: This crawl type must be fixed before using
-        '''
         elif crawl_type in ["followers", "following"]:
+            # TODO: Need to update this crawl type if we want it to work
+            print ("This crawl type is not currently working")
+            self.quit()
             # Need to login first before crawling followers/following
             print("You will need to login to crawl {}".format(crawl_type))
             self.login(authentication)
@@ -167,7 +163,11 @@ class InstagramCrawler(object):
             self.browse_target_page(query)
             # Scrape captions
             self.scrape_followers_or_following(crawl_type, query, number)
-        '''
+        else:
+            print("Unknown crawl type: {}".format(crawl_type))
+            self.quit()
+            return
+        
         
         # Save to directory
         print("Saving...")
