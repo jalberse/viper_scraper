@@ -65,7 +65,10 @@ HEADERS = {'User-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:65.0) Gecko
 # SELENIUM CSS SELECTOR
 CSS_LOAD_MORE = "a._1cr2e._epyes"
 CSS_RIGHT_ARROW = ".HBoOv"
+# TODO: Test on a variety of accts - this breaks for some?
+#       Almost positive that ACCOUNTS with NO STORIES breaks this - as its div[2] not div[3]
 FIREFOX_FIRST_POST_PATH = "/html/body/span/section/main/div/div[3]/article/div[1]/div/div[1]/div[1]"
+FIREFOX_FIRST_POST_PATH_NO_STORIES = "/html/body/span/section/main/div/div[2]/article/div[1]/div/div[1]/div[1]"
 FIREFOX_HASHTAG_FIRST_POST_PATH = "/html/body/span/section/main/article/div[1]/div/div/div[1]/div[1]"
 TIME_TO_CAPTION_PATH = "../../../div/ul/li/div/div/div/span"
 
@@ -193,8 +196,11 @@ class InstagramCrawler(object):
                     first_post = self._driver.find_element_by_xpath(
                         FIREFOX_HASHTAG_FIRST_POST_PATH)
                 else:
-                    first_post = self._driver.find_element_by_xpath(
-                    FIREFOX_FIRST_POST_PATH)
+                    es = self._driver.find_elements_by_xpath(FIREFOX_FIRST_POST_PATH)
+                    if not es:
+                        first_post = self._driver.find_element_by_xpath(FIREFOX_FIRST_POST_PATH_NO_STORIES)
+                    else:
+                        first_post = es[0]
                 first_post.click()
                 first_post.click()
 
@@ -204,7 +210,6 @@ class InstagramCrawler(object):
                             (By.CSS_SELECTOR, CSS_RIGHT_ARROW)
                         )
                     )
-                    if DEBUG: print('found element CSS_RIGHT_ARROW')
 
             elif number != 1:  # Click Right Arrow to move to next post
                 url_before = self._driver.current_url
@@ -232,7 +237,7 @@ class InstagramCrawler(object):
 
             # Parse caption
             try:
-                time_element = WebDriverWait(self._driver, 10).until(
+                time_element = WebDriverWait(self._driver, 600).until(
                     EC.presence_of_element_located((By.TAG_NAME, "time"))
                 )
                 caption = time_element.find_element_by_xpath(
@@ -251,23 +256,24 @@ class InstagramCrawler(object):
         dir_name = query.lstrip(
             '#') + '.hashtag' if query.startswith('#') else query
 
-        dir_path = os.path.join(dir_prefix, dir_name)
+        # dir_path is location of data for query
+        dir_path = os.path.join(dir_prefix,"instagram/data/", dir_name)
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
 
-        print("Saving to directory: {}".format(dir_path))
+        print("Saving to directory: {}".format(dir_prefix))
 
-        data_dir = os.path.join(dir_path,'data/')
-        if not os.path.exists(data_dir):
-            os.makedirs(data_dir)
-
-        images_dir = os.path.join(dir_path,'data/images/')
+        # we place images in an images/ dir in case we want to store other types of data later here
+        images_dir = os.path.join(dir_path,'images/')
         if not os.path.exists(images_dir):
             os.makedirs(images_dir)
 
-        with open(os.path.join(dir_path,"data.csv"),'a+') as f:
+        # data.csv lives above all queries and holds data for all of them
+        data_csv_path = os.path.join(dir_prefix,"instagram/data.csv")
+
+        with open(data_csv_path,'a+') as f:
             writer = csv.writer(f)
-            if os.path.getsize(os.path.join(dir_path,"data.csv")) == 0:
+            if os.path.getsize(data_csv_path) == 0:
                 writer.writerow(['imagefile', 'caption'])
             for photo_link, caption in zip(self.data['photo_links'], self.data['captions']):
                 # Save photo
@@ -279,7 +285,8 @@ class InstagramCrawler(object):
                 urlretrieve(photo_link, filepath)
 
                 # write to csv
-                writer.writerow([filepath,caption])
+                filepath_relative_to_csv = os.path.join("./data",dir_name,"images/",local_filename)
+                writer.writerow([filepath_relative_to_csv,caption])
 
     def browse_target_page(self, query):
         # Browse Hashtags

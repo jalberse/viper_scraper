@@ -29,9 +29,9 @@ def main():
                         default='metadata/tracking.txt',
                         help="Path to a text file containing a list of phrases, one per line, to track." +
                         " see https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html")
-    parser_twit.add_argument('-d','--dir',dest='data_directory',metavar="Data Directory",
-                        default='./data' + now.strftime('%Y%m%d%H%M%S'),
-                        help="The folder to download data to. Default ./dataYYYYMMDDHHMMSS/")
+    parser_twit.add_argument('-d','--dir_prefix',dest='data_directory',metavar="Data Directory",
+                        default='./data/',
+                        help="directory to save results")
     parser_twit.set_defaults(func=twitter)
 
     # Instagram parsing
