@@ -59,7 +59,6 @@ class MyStreamListener(tweepy.StreamListener):
         if status.text.startswith('RT'):
             return True # Ignore RTs to avoid repeat data
         try:
-            ## TODO: We got an error somewhere in here
             with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
                 writer = csv.writer(f)
                 media_urls, k = get_media_urls(status)
@@ -82,8 +81,9 @@ class MyStreamListener(tweepy.StreamListener):
                     # Need to do more research on how (CNN likely)
 
                     # CSV contains file location relative to CSV
+                    csv_to_file_path = os.path.join("data/images/",local_filename + ".jpg")
                     writer.writerow([status.user.id_str, status.id_str,
-                                     filename])
+                                     csv_to_file_path])
         except OSError:
             print(str(OSError))
             return False
@@ -106,11 +106,13 @@ def stream_scrape(tracking_file,directory,number=1000,):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-    data_dir = os.path.join(directory,'./data/')
+    twitter_dir = os.path.join(directory,"twitter/")
+
+    data_dir = os.path.join(twitter_dir,'data/')
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
-    images_dir = os.path.join(directory,'./data/images/')
+    images_dir = os.path.join(twitter_dir,'data/images/')
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
 
@@ -123,7 +125,7 @@ def stream_scrape(tracking_file,directory,number=1000,):
 
     # CSV file
     try:
-        filename = os.path.join(directory,'data.csv')
+        filename = os.path.join(twitter_dir,'data.csv')
         with open(filename, 'a+') as f:
             writer = csv.writer(f)
             if os.path.getsize(filename) == 0:
@@ -131,7 +133,7 @@ def stream_scrape(tracking_file,directory,number=1000,):
     except OSError:
         print("Could not create data.csv")
 
-    stream_listener = MyStreamListener(directory=directory,limit=number)
+    stream_listener = MyStreamListener(directory=twitter_dir,limit=number)
     stream = tweepy.Stream(auth=api.auth, listener=stream_listener,
                            tweet_mode='extended', stall_warnings=True)
     stream.filter(track=tracking) # To unblock, asynch = True
