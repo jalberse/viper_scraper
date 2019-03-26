@@ -138,7 +138,7 @@ class MyStreamListener(tweepy.StreamListener):
 
         except OSError:
             print(str(OSError))
-            return False
+            return True # TODO test if this allows us to recover gracefully
         return True
 
     def on_error(self, status_code):
