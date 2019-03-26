@@ -1,0 +1,12 @@
+hurricane
+tornado
+thunder
+lightning
+downpour
+hailstorm
+sleet
+snowing
+flooding
+snowstorm
+thunderstorm
+rainstorm

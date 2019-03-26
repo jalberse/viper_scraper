@@ -74,7 +74,6 @@ def instagram(args):
                   authentication=args.authentication)
 
 def twitter(args):
-    print (args.photos_act_as_limiter)
     tscraper.stream_scrape(tracking_file=args.tracking_file,directory=args.data_directory,
                            number=args.number,photos_act_as_limiter=args.photos_act_as_limiter)
 
