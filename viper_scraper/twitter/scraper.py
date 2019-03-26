@@ -7,7 +7,7 @@ import queue
 import uuid
 from random import randint
 
-DEBUG = 1
+DEBUG = 0
 
 ## set up OAuth from the keys file.
 ## .my_keys (in .gitignore) file takes precedence over the keys file for easily maintaining private keys
@@ -81,6 +81,7 @@ class MyStreamListener(tweepy.StreamListener):
                         self.photo_cnt = self.photo_cnt + 1
                         print("Downloading image " + str(self.photo_cnt))
                         if DEBUG:
+                            print("Downloading image " + str(self.photo_cnt))
                             print ("from url " + url)
                             print("from tweet https://twitter.com/statuses/" + status.id_str)
                             print("from user https://twitter.com/intent/user?user_id=" + status.user.id_str)
@@ -134,10 +135,14 @@ class MyStreamListener(tweepy.StreamListener):
                                 status.retweet_count,status.favorite_count,status.lang])
 
                 self.status_cnt = self.status_cnt + 1
-                print("Got tweet: " + str(self.status_cnt))
+                if DEBUG:
+                    print("Got tweet: " + str(self.status_cnt))
+                if self.status_cnt % 50 is 0:
+                    print("Scraping progress: " + str(self.status_cnt) + " tweets")
 
         except OSError:
             print(str(OSError))
+            print("On tweet " +str(self.status_cnt))
             return True # TODO test if this allows us to recover gracefully
         return True
 
@@ -188,6 +193,8 @@ def stream_scrape(tracking_file,directory,number=1000,photos_act_as_limiter=True
                     'retweet_count','favorite_count','lang'])
     except OSError:
         print("Could not create data.csv")
+
+    print("Starting stream...")
 
     stream_listener = MyStreamListener(directory=twitter_dir,status_limit=number,photo_limit=number,photos_act_as_limiter=photos_act_as_limiter)
     stream = tweepy.Stream(auth=api.auth, listener=stream_listener,
