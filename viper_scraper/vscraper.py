@@ -23,7 +23,7 @@ def main():
                                                           ' twitter --help for more information.')
     parser_twit.add_argument('-n', '--number', type=int, default=DEFAULT_NUMBER,
                         dest='number', metavar='Number',
-                        help="If data type is images, the number of images to "
+                        help="If photos as limit is true, the number of images to "
                         + "scrape. Else the number of posts to scrape.")
     parser_twit.add_argument('-t', '--tracking', dest='tracking_file', metavar='Tracking File',
                         default='metadata/tracking.txt',
@@ -32,6 +32,11 @@ def main():
     parser_twit.add_argument('-d','--dir_prefix',dest='data_directory',metavar="Data Directory",
                         default='./data/',
                         help="directory to save results")
+    parser_twit.add_argument('--photo_limit', dest='photos_act_as_limiter', action='store_true',
+                        help="number refers to number of photos, not tweets. This is the default.")
+    parser_twit.add_argument('--status_limit', dest='photos_act_as_limiter', action='store_false',
+                        help="number refers to number of tweets, not photos")
+    parser_twit.set_defaults(photos_act_as_limiter=True)
     parser_twit.set_defaults(func=twitter)
 
     # Instagram parsing
@@ -69,7 +74,9 @@ def instagram(args):
                   authentication=args.authentication)
 
 def twitter(args):
-    tscraper.stream_scrape(tracking_file=args.tracking_file,directory=args.data_directory,number=args.number)
+    print (args.photos_act_as_limiter)
+    tscraper.stream_scrape(tracking_file=args.tracking_file,directory=args.data_directory,
+                           number=args.number,photos_act_as_limiter=args.photos_act_as_limiter)
 
 if __name__ == "__main__":
     main()
