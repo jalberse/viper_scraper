@@ -12,7 +12,6 @@ DEBUG = 1
 ## set up OAuth from the keys file.
 ## .my_keys (in .gitignore) file takes precedence over the keys file for easily maintaining private keys
 
-## TODO: Set up mySQL database rather than saving to a csv
 ## TODO: log errors don't print them
 
 def get_api():
@@ -46,31 +45,42 @@ class MyStreamListener(tweepy.StreamListener):
     """
     Listen for data
     """
-    def __init__(self, directory, api=None, limit=1000):
+    def __init__(self, directory, api=None, status_limit=10000,photo_limit=1000,photos_act_as_limiter=True):
         super().__init__(api)
         self.directory = directory
-        self.limit = limit
-        self.cnt = 0
+        if (photos_act_as_limiter):
+            self.limit=photo_limit
+        else:
+            self.limit=status_limit
+        self.status_cnt = 0
+        self.photo_cnt = 0
+        self.photos_act_as_limiter = photos_act_as_limiter
 
     def on_status(self, status):
-        if self.cnt >= self.limit:
-            print("limit reached, exiting")
+        if self.photos_act_as_limiter and self.photo_cnt >= self.limit:
+            print("Photo limit reached, exiting")
             return False # we have reached the number of images to scrape
+        if not self.photos_act_as_limiter and self.status_cnt >= self.limit:
+            print("Status limit reached, exiting")
+            return False
+
         if status.text.startswith('RT'):
             return True # Ignore RTs to avoid repeat data
         try:
             with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
                 writer = csv.writer(f)
                 media_urls, k = get_media_urls(status)
-                # retrieve and save each
+                csv_to_image_file_path = ''
+                # retrieve and save each photo and relevant data
+                # note: Twitter API only allows to collect first photo in all cases. But this may change, so keeping this.
                 for url in media_urls:
                     local_filename = uuid.uuid4().hex
                     filename = os.path.join(self.directory,'data/images/', local_filename + ".jpg")
                     try:
                         urllib.request.urlretrieve(url, filename)
-                        self.cnt = self.cnt + 1
+                        self.photo_cnt = self.photo_cnt + 1
+                        print("Downloading image " + str(self.photo_cnt))
                         if DEBUG:
-                            print("Downloading image " + str(self.cnt))
                             print ("from url " + url)
                             print("from tweet https://twitter.com/statuses/" + status.id_str)
                             print("from user https://twitter.com/intent/user?user_id=" + status.user.id_str)
@@ -81,9 +91,51 @@ class MyStreamListener(tweepy.StreamListener):
                     # Need to do more research on how (CNN likely)
 
                     # CSV contains file location relative to CSV
-                    csv_to_file_path = os.path.join("data/images/",local_filename + ".jpg")
-                    writer.writerow([status.user.id_str, status.id_str,
-                                     csv_to_file_path])
+                    csv_to_image_file_path = os.path.join("data/images/",local_filename + ".jpg")
+
+                '''
+                ['user_id', 'tweet_id', 'imagefile','created_at',
+                'source','truncated','in_reply_to_status_id','in_reply_to_user_id',
+                'in_reply_to_screen_name','longitude','latitude','place_full_name',
+                'place_type','place_id','place_url','quote_count','reply_count',
+                'retweet_count','favorite_count','lang'])
+                '''
+                # Handle nullable objects in tweet
+                lon = ''
+                lat = ''
+                if status.coordinates is not None:
+                    lon = status.coordinates["coordinates"][0]
+                    lat = status.coordinates["coordinates"][1]
+                place_full_name = ''
+                place_type = ''
+                place_id = ''
+                place_url = ''
+                if status.place is not None:
+                    place_full_name = status.place.full_name
+                    place_type = status.place.place_type
+                    place_id = status.place.id
+                    place_url = status.place.url
+
+                # Handle getting full text of tweet (deals with truncation)
+                text = ''
+                try:
+                    if hasattr(status, 'extended_tweet'):
+                        text = status.extended_tweet['full_text']
+                    else:
+                        text = status.text
+                except AttributeError:
+                    print('attribute error: ' + status.text)
+
+                # Finally write data to csv line
+                writer.writerow([status.user.id_str, status.id_str,text,csv_to_image_file_path,status.created_at,
+                                status.source,status.truncated,status.in_reply_to_status_id_str,status.in_reply_to_user_id_str,
+                                status.in_reply_to_screen_name,lon,lat,place_full_name,
+                                place_type,place_id,place_url,status.quote_count,status.reply_count,
+                                status.retweet_count,status.favorite_count,status.lang])
+
+                self.status_cnt = self.status_cnt + 1
+                print("Got tweet: " + str(self.status_cnt))
+
         except OSError:
             print(str(OSError))
             return False
@@ -95,7 +147,7 @@ class MyStreamListener(tweepy.StreamListener):
             return False
         return False
 
-def stream_scrape(tracking_file,directory,number=1000,):
+def stream_scrape(tracking_file,directory,number=1000,photos_act_as_limiter=True):
     """
     Scrape number images from tweets using the tweepy streaming API
 
@@ -123,20 +175,44 @@ def stream_scrape(tracking_file,directory,number=1000,):
         print("Error opening tracking.txt")
         return
 
-    # CSV file
+    # CSV file - create and write header if necessary
     try:
         filename = os.path.join(twitter_dir,'data.csv')
         with open(filename, 'a+') as f:
             writer = csv.writer(f)
             if os.path.getsize(filename) == 0:
-                writer.writerow(['user_id', 'tweet_id', 'imagefile'])
+                writer.writerow(['user_id', 'tweet_id', 'text','imagefile','created_at',
+                    'source','truncated','in_reply_to_status_id','in_reply_to_user_id',
+                    'in_reply_to_screen_name','longitude','latitude','place_full_name',
+                    'place_type','place_id','place_url','quote_count','reply_count',
+                    'retweet_count','favorite_count','lang'])
     except OSError:
         print("Could not create data.csv")
 
-    stream_listener = MyStreamListener(directory=twitter_dir,limit=number)
+    stream_listener = MyStreamListener(directory=twitter_dir,status_limit=number,photo_limit=number,photos_act_as_limiter=photos_act_as_limiter)
     stream = tweepy.Stream(auth=api.auth, listener=stream_listener,
                            tweet_mode='extended', stall_warnings=True)
     stream.filter(track=tracking) # To unblock, asynch = True
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def snowball_scrape(seed_user_screen_name, number=1000, limit_per_user=-1, limit_neighbors_per_node=-1):
     """
