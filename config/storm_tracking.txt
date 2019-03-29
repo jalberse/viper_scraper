@@ -10,7 +10,6 @@ flooding
 snowstorm
 thunderstorm
 rainstorm
-mozambique
 tornado watch
 tornado warning
 severe thunderstorm

@@ -5,6 +5,7 @@ data*/
 .vscode/
 TODO.txt
 __pycache__
+.storm_tracking.txt
 
 # Default data directory
 data
