@@ -1,19 +1,12 @@
-hurricane
-tornado
 thunder
 lightning
 downpour
 hailstorm
 sleet
-snowing
-flooding
-snowstorm
+raining
+storming
+hailing
 thunderstorm
 rainstorm
-tornado watch
-tornado warning
 severe thunderstorm
-flash flood
-blizzard
-winter storm
 ice storm
