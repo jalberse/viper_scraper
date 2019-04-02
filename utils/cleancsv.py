@@ -2,7 +2,7 @@ import os
 import csv
 import argparse
 
-DEBUG = 1
+DEBUG = 0
 
 def argument_parsing():
     """
@@ -18,9 +18,9 @@ def argument_parsing():
 def clean_csv():
     """
     Removes rows of csv which reference a file which no longer exists
+    AND removes records which do not have associated image
     """
     args = argument_parsing()
-
     try:
         infilename = args.file
         tempfilename = os.path.join(os.path.dirname(args.file),'temp.csv')
@@ -30,10 +30,10 @@ def clean_csv():
             reader = csv.reader(f)
             next (reader,None)
             for row in reader:
-                if os.path.exists(os.path.join(os.path.dirname(args.file),row[2])):
+                if row[3] is not "" and os.path.exists(os.path.join(os.path.dirname(args.file),row[3])):
                     writer.writerow(row) # only write rows with existing files
                 else:
-                    if DEBUG: print ('deleting references to file ' + row[2])
+                    if DEBUG: print ('deleting references to file ' + row[3])
     except OSError:
         print(OSError)
 
