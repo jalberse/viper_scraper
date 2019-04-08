@@ -9,6 +9,8 @@ verify_ssl = true
 tweepy = "*"
 bs4 = "*"
 selenium = "*"
+numpy = "*"
+opencv-python = "*"
 
 [requires]
 python_version = "3.7"

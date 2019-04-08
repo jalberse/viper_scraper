@@ -66,6 +66,7 @@ class MyStreamListener(tweepy.StreamListener):
 
         if status.text.startswith('RT'):
             return True # Ignore RTs to avoid repeat data
+        # TODO Move stuff out of the try block unless actually using csv
         try:
             with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
                 writer = csv.writer(f)

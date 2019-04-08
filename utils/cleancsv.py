@@ -28,7 +28,8 @@ def clean_csv():
         with open (infilename, 'r') as f, open (tempfilename, 'w') as out:
             writer = csv.writer(out)
             reader = csv.reader(f)
-            next (reader,None)
+            header = next (reader,None)
+            writer.writerow(header)
             for row in reader:
                 if row[3] is not "" and os.path.exists(os.path.join(os.path.dirname(args.file),row[3])):
                     writer.writerow(row) # only write rows with existing files
