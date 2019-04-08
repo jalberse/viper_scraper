@@ -6,6 +6,7 @@ data*/
 TODO.txt
 __pycache__
 .storm_tracking.txt
+yolo
 
 # Default data directory
 data
