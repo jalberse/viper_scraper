@@ -6,6 +6,7 @@ data*/
 TODO.txt
 __pycache__
 .storm_tracking.txt
+yolo
 
 # Default data directory
 data
@@ -23,3 +24,4 @@ page
 # large files user should install
 geckodriver*
 phantomjs*
+InstagramCrawler/phantom*
