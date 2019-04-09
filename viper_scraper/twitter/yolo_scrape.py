@@ -93,6 +93,24 @@ class YoloStreamListener(tweepy.StreamListener):
                     cv2.rectangle(image, (x,y), (x + w, y + h),color, 2)
                     text = "{}: {:.4f}".format(self.LABELS[labels[i]], confidences[i])
                     cv2.putText(image,text,(x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+            # create a dict of labels:[confidences]
+            # populate dict with ALL labels associated with empty arrays
+            detected = {}
+            for l in self.LABELS:
+                detected[l] = []
+
+            if len(idxs) > 0:
+                for i in idxs.flatten():
+                    # TODO append the confidence to the label's associated array
+                    detected[self.LABELS[labels[i]]].append(confidences[i])
+                
+            # save this data to disk
+            filename_json = os.path.join(self.directory,'data/images/',file_id + ".json")
+            with open(filename_json,'w') as f:
+                json.dump(detected,f)
+
+            csv_to_json_file_path = os.path.join('data/images/',file_id + ".json")
             
             # Save the image with bounding boxes to disk
             filename_marked = os.path.join(self.directory,'data/images/', file_id + "_marked.jpg")
@@ -100,6 +118,7 @@ class YoloStreamListener(tweepy.StreamListener):
 
             csv_to_marked_image_file_path = os.path.join("data/images/",file_id + "marked.jpg")
 
+            # TODO place file location of confidences JSON file into csv
             # Write stuff to CSV
             try:
                 with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
@@ -138,7 +157,7 @@ class YoloStreamListener(tweepy.StreamListener):
                                 status.source,status.truncated,status.in_reply_to_status_id_str,status.in_reply_to_user_id_str,
                                 status.in_reply_to_screen_name,lon,lat,place_full_name,
                                 place_type,place_id,place_url,status.quote_count,status.reply_count,
-                                status.retweet_count,status.favorite_count,status.lang])
+                                status.retweet_count,status.favorite_count,status.lang,csv_to_json_file_path])
             except OSError:
                 print(str(OSError) + "Error writing to CSV")
                 print("On tweet " +str(self.cnt))
@@ -181,11 +200,11 @@ def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_
         with open(filename, 'a+') as f:
             writer = csv.writer(f)
             if os.path.getsize(filename) == 0:
-                writer.writerow(['user_id', 'tweet_id', 'text','imagefile','marked_up_image_file',
+                writer.writerow(['user_id', 'tweet_id', 'text','image_file','marked_up_image_file',
                     'created_at','source','truncated','in_reply_to_status_id',
                     'in_reply_to_user_id','in_reply_to_screen_name','longitude','latitude',
                     'place_full_name','place_type','place_id','place_url','quote_count',
-                    'reply_count','retweet_count','favorite_count','lang'])
+                    'reply_count','retweet_count','favorite_count','lang','detected_file'])
     except OSError:
         print("Could not create data.csv")
 
