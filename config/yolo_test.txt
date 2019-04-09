@@ -1,7 +1,0 @@
-person
-bike
-traffic
-car
-cat
-dog
-puppy

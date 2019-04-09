@@ -149,7 +149,9 @@ class YoloStreamListener(tweepy.StreamListener):
                     except AttributeError:
                         print('attribute error: ' + status.text)
 
-                    # TODO: Write confidences etc to csv
+                    self.cnt = self.cnt + 1
+                    if self.cnt % 25 is 0:
+                        print(str(self.cnt) + " tweets downloaded")
 
                     # Finally write data to csv line
                     writer.writerow([status.user.id_str, status.id_str,text,csv_to_image_file_path,
