@@ -11,6 +11,9 @@ bs4 = "*"
 selenium = "*"
 numpy = "*"
 opencv-python = "*"
+pandas = "*"
+nltk = "*"
+sklearn = "*"
 
 [requires]
 python_version = "3.7"
