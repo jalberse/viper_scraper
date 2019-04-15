@@ -1,12 +1,16 @@
 # Viper Scraper
 
-Scraping and ingesting multi-model data
+Scraping and ingesting multi-model data from online social networks
 
 ## Use
 
 Before using any script, run `pipenv shell` to enter the virtual environment.
 
 ### Scraping Twitter
+
+```
+python viper_scraper.py twitter ...
+```
 
 Using the Twitter scraper requires registering as a Twitter developer and providing authentication keys. Place your keys in either *.my_keys* (in .gitignore) or *config/keys.json*
 
@@ -23,6 +27,10 @@ python viper_scraper.py twitter [-h] [-n Number] [-t Tracking File] [-d Director
 The Twitter scraper filters realtime tweets using the [Twitter API](https://developer.twitter.com/en/docs.html). Text, metadata, and references to donwloaded images are stored in data.csv under the specified directory.
 
 ### YOLO integration with Twitter
+
+```
+python viper_scraper.py yolo ...
+```
 
 The VIPER scraper also integrates [YOLO](https://pjreddie.com/darknet/yolo/) (You Only Look Once) real-time object detection.
 
@@ -45,7 +53,7 @@ python viper_scraper.py yolo [-h] [-d Data Directory] [-t Tracking File] [-n NUM
 
 `-n NUMBER` : The number of images to scrape.
 
-`--names NAMES` : A file containing the names, one per line, associated with the weights and config file for YOLO. Example [coco.names](https://github.com/pjreddie/darknet/blob/master/data/coco.names).
+`--names NAMES` : A file containing the names, one per line, associated with the weights and config file for YOLO, e.g. [coco.names](https://github.com/pjreddie/darknet/blob/master/data/coco.names).
 
 `--config CONFIG` : Config file for YOLO, e.g. [yolov3.cfg](https://github.com/pjreddie/darknet/blob/master/cfg/yolov3.cfg).
 
@@ -65,16 +73,23 @@ python viper_scraper.py yolo -d data_yolo_test -t config/plane_tracking.txt -n 1
 
 ### Tracking file generation
 
+```
+python utils/tracking_generator.py [CSV]
+```
+
 *This functionality is currently under development, see utils/tracking_generator.py*
 
 The tracking_generator.py script takes the CSV and data obtained by running `viper_scraper.py yolo` and generates a tracking file for future use. 
 
-For example, say that we are scraping for pictures of airplanes. We might start with a tracking file containing phrases such as "flying", "airplane", "travel", etc. The script partitions the resultant data into tweets which contain a picture of an airplane (YOLO detected at least one airplane above some confidence threshold) and those that do not. It takes the first partition and ranks phrases by TF-IDF score. The top n are placed into the new tracking file.
+For example, say that we are scraping for pictures of airplanes. We might start with a tracking file containing phrases such as "flying", "airplane", "travel", etc. The script partitions the resultant data into tweets which contain a picture of an airplane (YOLO detected at least one airplane above some confidence threshold) and those that do not. It takes the first partition and ranks phrases in the body of the tweets by TF-IDF score. The top n are placed into the new tracking file.
 
 The data obtained using the new tracking file will (hopefully) have a higher ratio and volume of pictures of airplanes, as the phrases are known to be associated with desirable photos.
 
-
 ### Scraping Instagram
+
+```
+python viper_scraper.py instagram ...
+```
 
 This script and associated utility scripts are based on Antonie Lin's non-API instagram scraper under the MIT license. Visit his repository at:
 
@@ -113,6 +128,8 @@ viper_scraper.py instagram [-h] [-d DIR_PREFIX] [-q QUERY] [-n NUMBER] [-c capti
 `f FIREFOX_PATH` : Path to the firefox installation for selenium.
 
 #### Examples:
+
+For example,
 
 ```
 python viper_scraper.py instagram -d data_insta_test -q "#art" -c -n 100`
