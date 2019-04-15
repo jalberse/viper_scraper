@@ -20,7 +20,6 @@ def trending_phrases(csv_filename):
     print(df.size)
 
     # Partition data - only want to analyze desirable set
-    # TODO what?? why does it think axis is a parameter for is_above_threshold???????
     m = df['detected_file'].apply(is_above_threshold,args=[csv_filename,.5],)
     data_filtered = df[m]
 
