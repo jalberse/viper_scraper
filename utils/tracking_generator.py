@@ -31,6 +31,7 @@ def trending_phrases(csv_filename):
     feature_names = vectorizer.get_feature_names()    #  weight is the tf-idf value
     weight = vectorizer.idf_
     #sorting the weights
+    # TODO: Apparently not sorting correctly - fix
     indices = np.argsort(weight)[::-1]
     top_weights = 400
     top_features = [feature_names[i] for i in indices[:top_weights]]
@@ -56,6 +57,7 @@ def is_above_threshold(detected_filename, csv_filename, threshold):
         print(e)
         return False
 
+# TODO: Actually let choose what we are looking for and confidence threshold
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 

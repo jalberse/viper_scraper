@@ -23,7 +23,7 @@ def get_api():
         if os.path.isfile(".my_keys"):
             keys_file = open(".my_keys", 'r')
         else:
-            keys_file = open("metadata/keys.json", 'r')
+            keys_file = open("config/keys.json", 'r')
     except OSError:
         print("Error opening keys file")
 
