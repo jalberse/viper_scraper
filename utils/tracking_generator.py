@@ -7,6 +7,7 @@ import os
 import glob
 import argparse
 import json
+import sys
 from nltk.tokenize import TweetTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from operator import itemgetter
@@ -15,26 +16,30 @@ def trending_phrases(csv_filename):
     """
     Get top 400 trending phrases from our data and saves in the topn.txt file
     """
+    np.set_printoptions(threshold=sys.maxsize)
+
     df = pd.read_csv(csv_filename)
 
-    print(df.size)
+    print(str(df.size) + " Total tweets")
 
     # Partition data - only want to analyze desirable set
     m = df['detected_file'].apply(is_above_threshold,args=[csv_filename,.5],)
     data_filtered = df[m]
 
-    print(data_filtered.size)
+    print(str(data_filtered.size) + " contain target")
 
     tokenizer = TweetTokenizer()
+    # Override the tokenizer of the tfidfvectorizer with one made for tweets
     vectorizer = TfidfVectorizer(tokenizer=tokenizer.tokenize,ngram_range=(1,2)) # One to two word phrases
-    response = vectorizer.fit_transform(data_filtered['text'])    # Map feature index to feature name
-    feature_names = vectorizer.get_feature_names()    #  weight is the tf-idf value
+    # Get term-document matrix from tweets' text
+    tdmat = vectorizer.fit_transform(data_filtered['text'])
+    feature_names = vectorizer.get_feature_names()
     weight = vectorizer.idf_
-    #sorting the weights
-    # TODO: Apparently not sorting correctly - fix
+    # Indices which would sort weights
     indices = np.argsort(weight)[::-1]
-    top_weights = 400
-    top_features = [feature_names[i] for i in indices[:top_weights]]
+    n = 400
+    # Grab top n features
+    top_features = [feature_names[i] for i in indices[:n]]
     with open('topn.txt', 'w') as f:
         for word in top_features:
             f.write(word + '\n')
