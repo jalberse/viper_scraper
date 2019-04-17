@@ -16,15 +16,19 @@ def trending_phrases(csv_filename):
     """
     Get top 400 trending phrases from our data and saves in the topn.txt file
     """
-    np.set_printoptions(threshold=sys.maxsize)
-
     df = pd.read_csv(csv_filename)
 
     print(str(df.size) + " Total tweets")
 
     # Partition data - only want to analyze desirable set
+    # m is bools
     m = df['detected_file'].apply(is_above_threshold,args=[csv_filename,.5],)
-    data_filtered = df[m]
+    
+    # Remove URLs (links to images) or else they dominate ranking
+    # Remove special chars (less # and @)
+    data_filtered = df[m].replace('https?:\/\/.*[\r\n]*|[^0-9a-zA-Z#@]+',' ',regex=True)
+    
+    data_filtered.to_csv('ah')
 
     print(str(data_filtered.size) + " contain target")
 
@@ -43,6 +47,7 @@ def trending_phrases(csv_filename):
     with open('topn.txt', 'w') as f:
         for word in top_features:
             f.write(word + '\n')
+
 
 # Returns true if the object has been detected with some confidence above
 # the threshold in the image
