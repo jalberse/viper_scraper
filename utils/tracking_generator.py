@@ -12,6 +12,40 @@ from nltk.tokenize import TweetTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from operator import itemgetter
 
+# Generate the tracking file with TF-IDF technique
+def tfidf_generation(data_filtered):
+    # TODO: Improve generation
+        # See if a larger dataset will improve output
+        # Are twitter documents too small for good TFIDF weighting?
+
+
+    tokenizer = TweetTokenizer()
+    # Override the tokenizer of the tfidfvectorizer with one made for tweets
+    vectorizer = TfidfVectorizer(tokenizer=tokenizer.tokenize,ngram_range=(1,3))
+    # Get term-document matrix from tweets' text
+    tdmat = vectorizer.fit_transform(data_filtered['text'])
+    feature_names = vectorizer.get_feature_names()
+    weight = vectorizer.idf_
+    # Indices which would sort weights
+    indices = np.argsort(weight)[::-1]
+    n = 400
+    # Grab top n features
+    top_features = [feature_names[i] for i in indices[:n]]
+    with open('topn.txt', 'w') as f:
+        for word in top_features:
+            f.write(word + '\n')
+
+# TODO: Simple frequency (with stop words) file generation
+
+# TODO: relative normalized term frequency generation
+def relative_frequency_generation(data_filtered):
+    # TODO: Need a base frequency table
+    # one here:
+    # https://github.com/ddandur/Twords/blob/master/jar_files_and_background/freq_table_72319443_total_words_twitter_corpus.csv
+    # But do not know their source
+    print("Do this")
+
+# Partitioning data and cleaning text before sending to file generation fns
 def trending_phrases(csv_filename):
     """
     Get top 400 trending phrases from our data and saves in the topn.txt file
@@ -27,27 +61,10 @@ def trending_phrases(csv_filename):
     # Remove URLs (links to images) or else they dominate ranking
     # Remove special chars (less # and @)
     data_filtered = df[m].replace('https?:\/\/.*[\r\n]*|[^0-9a-zA-Z#@]+',' ',regex=True)
-    
-    data_filtered.to_csv('ah')
 
     print(str(data_filtered.size) + " contain target")
 
-    tokenizer = TweetTokenizer()
-    # Override the tokenizer of the tfidfvectorizer with one made for tweets
-    vectorizer = TfidfVectorizer(tokenizer=tokenizer.tokenize,ngram_range=(1,2)) # One to two word phrases
-    # Get term-document matrix from tweets' text
-    tdmat = vectorizer.fit_transform(data_filtered['text'])
-    feature_names = vectorizer.get_feature_names()
-    weight = vectorizer.idf_
-    # Indices which would sort weights
-    indices = np.argsort(weight)[::-1]
-    n = 400
-    # Grab top n features
-    top_features = [feature_names[i] for i in indices[:n]]
-    with open('topn.txt', 'w') as f:
-        for word in top_features:
-            f.write(word + '\n')
-
+    tfidf_generation(data_filtered)
 
 # Returns true if the object has been detected with some confidence above
 # the threshold in the image
