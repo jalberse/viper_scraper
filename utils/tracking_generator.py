@@ -17,6 +17,7 @@ def tfidf_generation(data_filtered):
     # TODO: Improve generation
         # See if a larger dataset will improve output
         # Are twitter documents too small for good TFIDF weighting?
+        # Consider - can we cluster tweets to improve? 
 
 
     tokenizer = TweetTokenizer()
@@ -40,6 +41,8 @@ def tfidf_generation(data_filtered):
 # TODO: relative normalized term frequency generation
 def relative_frequency_generation(data_filtered):
     # TODO: Need a base frequency table
+    # See Edinburgh Twitter Corpus
+
     # one here:
     # https://github.com/ddandur/Twords/blob/master/jar_files_and_background/freq_table_72319443_total_words_twitter_corpus.csv
     # But do not know their source
@@ -65,6 +68,7 @@ def trending_phrases(csv_filename):
     print(str(data_filtered.size) + " contain target")
 
     tfidf_generation(data_filtered)
+    #relative_frequency_generation(data_filtered)
 
 # Returns true if the object has been detected with some confidence above
 # the threshold in the image
