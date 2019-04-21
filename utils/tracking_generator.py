@@ -15,9 +15,8 @@ from operator import itemgetter
 # Generate the tracking file with TF-IDF technique
 def tfidf_generation(data_filtered):
     # TODO: Improve generation
-        # See if a larger dataset will improve output
-        # Are twitter documents too small for good TFIDF weighting?
-        # Consider - can we cluster tweets to improve? 
+        # Right now, just gets top from the inverse document frequency vector
+        # Consider ways to use tf-idf to get good phrases?
 
 
     tokenizer = TweetTokenizer()
