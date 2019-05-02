@@ -10,13 +10,58 @@ import json
 import sys
 from nltk.tokenize import TweetTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 from operator import itemgetter
 
-# Generate the tracking file with TF-IDF technique
-def tfidf_generation(data_filtered):
+def normalized_relative_term_frequency_generator(data_filtered):
+    tokenizer = TweetTokenizer()
+    vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,ngram_range=(1,1))
+
+    # Get count of each term in each document
+    count_matrix = vectorizer.fit_transform(data_filtered['text']) #term-document matrix
+    feature_names = vectorizer.get_feature_names() # terms, corresponding with columns of t-d matrix
+
+    # Count total words
+    total_words = count_matrix.sum()       # np.int64
+    # Sum each column (term) to get term counts
+    # Note each column corresponds to each term in feature_names
+    term_counts = count_matrix.sum(axis=0) # np.matrix shape (1, len(feature_names))
+
+    # Calculate term frequency of each term
+    term_frequencies = np.divide(term_counts,total_words)
+
+    # Load baseline frequencies into dictionary for comparison
+    baseline_frequencies = {} #name, frequency pairs
+    with open('utils/freq_table_72319443_total_words_twitter_corpus.csv','r') as f:
+        reader = csv.reader(f)
+        next(reader) # skip header
+        for row in reader:
+            baseline_frequencies[row[0]] = float(row[2])
+    
+    # Calculate relative frequencies (tf / tf_baseline)
+    relative_frequencies = []
+    i = 0
+    for tf in np.nditer(term_frequencies):
+        if (baseline_frequencies.__contains__(feature_names[i])):
+            relative_frequencies.append(tf / baseline_frequencies[feature_names[i]])
+        i += 1
+
+    # Get indices which would sort relative frequencies
+    indices = np.argsort(relative_frequencies)[::-1]
+    
+    n = 400 # Number of terms to save
+
+    # Use to grab the top n terms and save to file
+    top_features = [feature_names[i] for i in indices[:n]]
+    with open('topn.txt', 'w') as f:
+        for word in top_features:
+            f.write(word + '\n')
+
+# Generate the tracking file with TF-IDF
+def tfidf_generator(data_filtered):
     # TODO: Improve generation
         # Right now, just gets top from the inverse document frequency vector
-        # Consider ways to use tf-idf to get good phrases?
+        # Use average TFIDF of terms across documents
 
 
     tokenizer = TweetTokenizer()
@@ -37,16 +82,6 @@ def tfidf_generation(data_filtered):
 
 # TODO: Simple frequency (with stop words) file generation
 
-# TODO: relative normalized term frequency generation
-def relative_frequency_generation(data_filtered):
-    # TODO: Need a base frequency table
-    # See Edinburgh Twitter Corpus
-
-    # one here:
-    # https://github.com/ddandur/Twords/blob/master/jar_files_and_background/freq_table_72319443_total_words_twitter_corpus.csv
-    # But do not know their source
-    print("Do this")
-
 # Partitioning data and cleaning text before sending to file generation fns
 def trending_phrases(csv_filename):
     """
@@ -54,7 +89,7 @@ def trending_phrases(csv_filename):
     """
     df = pd.read_csv(csv_filename)
 
-    print(str(df.size) + " Total tweets")
+    print(str(len(df.index)) + ' total tweets')
 
     # Partition data - only want to analyze desirable set
     # m is bools
@@ -64,10 +99,9 @@ def trending_phrases(csv_filename):
     # Remove special chars (less # and @)
     data_filtered = df[m].replace('https?:\/\/.*[\r\n]*|[^0-9a-zA-Z#@]+',' ',regex=True)
 
-    print(str(data_filtered.size) + " contain target")
+    print(str(len(data_filtered.index)) + " contain target")
 
-    tfidf_generation(data_filtered)
-    #relative_frequency_generation(data_filtered)
+    normalized_relative_term_frequency_generator(data_filtered)
 
 # Returns true if the object has been detected with some confidence above
 # the threshold in the image
