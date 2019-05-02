@@ -3,6 +3,7 @@ import numpy as np
 import csv
 import logging
 import nltk
+from nltk.corpus import stopwords
 import os
 import glob
 import argparse
@@ -17,9 +18,13 @@ from operator import itemgetter
 Generates a tracking file with basic term frequency calculations and stop words
 '''
 def simple_term_frequency_generator(data_filtered):
-    # TODO improve stopword filtering
+    stops = stopwords.words('english')
+    # TODO Improve stopword generation by adding to this list
+    #       include stopwords of other languages as well
+    #       See twitter trend detection papers for stopword generation
+
     tokenizer = TweetTokenizer()
-    vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,ngram_range=(1,1))
+    vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,stop_words=stops,ngram_range=(1,1))
 
     # Get count of each term in each document
     count_matrix = vectorizer.fit_transform(data_filtered['text']) #term-document matrix
@@ -37,17 +42,18 @@ def simple_term_frequency_generator(data_filtered):
     # Get indices which would sort frequencies
     indices = np.argsort(term_frequencies.tolist()[0])[::-1]
     
-    n = 400 # Number of terms to save
+    n = 40 # Number of terms to save
 
     # Use to grab the top n terms and save to file
     top_features = [feature_names[i] for i in indices[:n]]
+    print(top_features)
     with open('topn.txt', 'w') as f:
         for word in top_features:
             f.write(word + '\n')
 
 def normalized_relative_term_frequency_generator(data_filtered):
     tokenizer = TweetTokenizer()
-    vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,ngram_range=(1,1))
+    vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,stop_words=stopwords.words('english'),ngram_range=(1,1))
 
     # Get count of each term in each document
     count_matrix = vectorizer.fit_transform(data_filtered['text']) #term-document matrix
@@ -155,6 +161,7 @@ def is_above_threshold(detected_filename, csv_filename, threshold):
 
 # TODO: Actually let choose what we are looking for and confidence threshold
 if __name__ == '__main__':
+    # TODO: actually let user specify target, not just "aeroplane"
     parser = argparse.ArgumentParser()
 
     parser.add_argument('csv_file',metavar="CSV File",
