@@ -13,6 +13,38 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import CountVectorizer
 from operator import itemgetter
 
+'''
+Generates a tracking file with basic term frequency calculations and stop words
+'''
+def simple_term_frequency_generator(data_filtered):
+    # TODO improve stopword filtering
+    tokenizer = TweetTokenizer()
+    vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,ngram_range=(1,1))
+
+    # Get count of each term in each document
+    count_matrix = vectorizer.fit_transform(data_filtered['text']) #term-document matrix
+    feature_names = vectorizer.get_feature_names() # terms, corresponding with columns of t-d matrix
+
+    # Count total words
+    total_words = count_matrix.sum()       # np.int64
+    # Sum each column (term) to get term counts
+    # Note each column corresponds to each term in feature_names
+    term_counts = count_matrix.sum(axis=0) # np.matrix shape (1, len(feature_names))
+
+    # Calculate term frequency of each term
+    term_frequencies = np.divide(term_counts,total_words)
+
+    # Get indices which would sort frequencies
+    indices = np.argsort(term_frequencies.tolist()[0])[::-1]
+    
+    n = 400 # Number of terms to save
+
+    # Use to grab the top n terms and save to file
+    top_features = [feature_names[i] for i in indices[:n]]
+    with open('topn.txt', 'w') as f:
+        for word in top_features:
+            f.write(word + '\n')
+
 def normalized_relative_term_frequency_generator(data_filtered):
     tokenizer = TweetTokenizer()
     vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,ngram_range=(1,1))
@@ -101,7 +133,7 @@ def trending_phrases(csv_filename):
 
     print(str(len(data_filtered.index)) + " contain target")
 
-    normalized_relative_term_frequency_generator(data_filtered)
+    simple_term_frequency_generator(data_filtered)
 
 # Returns true if the object has been detected with some confidence above
 # the threshold in the image
