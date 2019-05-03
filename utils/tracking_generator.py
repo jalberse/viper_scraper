@@ -22,6 +22,7 @@ def simple_term_frequency_generator(data_filtered):
     # TODO Improve stopword generation by adding to this list
     #       include stopwords of other languages as well
     #       See twitter trend detection papers for stopword generation
+    #       lossy counting algorithm?
 
     tokenizer = TweetTokenizer()
     vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,stop_words=stops,ngram_range=(1,1))
@@ -51,6 +52,7 @@ def simple_term_frequency_generator(data_filtered):
         for word in top_features:
             f.write(word + '\n')
 
+# TODO try using raw term frequencies as a threshold
 def normalized_relative_term_frequency_generator(data_filtered):
     tokenizer = TweetTokenizer()
     vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,stop_words=stopwords.words('english'),ngram_range=(1,1))
@@ -87,10 +89,23 @@ def normalized_relative_term_frequency_generator(data_filtered):
     # Get indices which would sort relative frequencies
     indices = np.argsort(relative_frequencies)[::-1]
     
+    # Use raw term count as a threshold
+    # TODO use raw frequency instead? 
+
     n = 400 # Number of terms to save
 
     # Use to grab the top n terms and save to file
-    top_features = [feature_names[i] for i in indices[:n]]
+    # top_features = [feature_names[i] for i in indices[:n]]
+
+    cnt_above_threshold = 0
+    top_features = []
+    for i in indices:
+        if term_counts.item(i) > 10: # the raw term count threshold
+            top_features.append(feature_names[i])
+            if cnt_above_threshold == n: break
+
+    print(top_features)
+
     with open('topn.txt', 'w') as f:
         for word in top_features:
             f.write(word + '\n')
@@ -139,7 +154,7 @@ def trending_phrases(csv_filename):
 
     print(str(len(data_filtered.index)) + " contain target")
 
-    simple_term_frequency_generator(data_filtered)
+    normalized_relative_term_frequency_generator(data_filtered)
 
 # Returns true if the object has been detected with some confidence above
 # the threshold in the image
