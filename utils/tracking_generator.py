@@ -54,8 +54,10 @@ def simple_term_frequency_generator(data_filtered):
 
 # TODO try using raw term frequencies as a threshold
 def normalized_relative_term_frequency_generator(data_filtered):
+    stops = stop_words=stopwords.words('english')
+
     tokenizer = TweetTokenizer()
-    vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,stop_words=stopwords.words('english'),ngram_range=(1,1))
+    vectorizer = CountVectorizer(tokenizer=tokenizer.tokenize,stop_words=stops,ngram_range=(1,1))
 
     # Get count of each term in each document
     count_matrix = vectorizer.fit_transform(data_filtered['text']) #term-document matrix
