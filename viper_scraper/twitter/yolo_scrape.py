@@ -43,8 +43,8 @@ class YoloStreamListener(tweepy.StreamListener):
             filename = os.path.join(self.directory,'data/images/', file_id + ".jpg")
             try:
                 urllib.request.urlretrieve(url, filename)
-            except urllib.error.HTTPError:
-                print("HTTPError, skipping media")
+            except Exception as e:
+                print(e)
                 return True # skip this tweet but continue streaming
             csv_to_image_file_path = os.path.join("data/images/",file_id + ".jpg")
 
