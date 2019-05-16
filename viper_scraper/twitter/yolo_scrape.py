@@ -59,7 +59,6 @@ class YoloStreamListener(tweepy.StreamListener):
     def on_status(self, status):
         if not q.full():
             q.put(status)
-        print(q.qsize())
 
     def on_error(self, status_code):
         if status_code == 420:
