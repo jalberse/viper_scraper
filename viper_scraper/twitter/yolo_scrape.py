@@ -13,13 +13,14 @@ import _thread
 
 from . import scraper as twitter_scraper
 
-q = queue.Queue() # tweet Queue - stream produces and threads consumer
+q = queue.Queue(maxsize=10000) # tweet Queue - stream produces and threads consumer
+csv_lock = threading.Lock()    # Lock for data.csv
 
+#TODO this belongs in a utility file
 class AtomicCounter:
     """
     Thread-safe counter
     """
-
     def __init__(self,val=0):
         self.value = val
         self._lock = threading.Lock()
@@ -29,8 +30,9 @@ class AtomicCounter:
             self.value += num
             return self.value
 
-    def value():
-        return self.value
+    def getValue(self):
+        with self._lock:
+            return self.value
 
 cnt = AtomicCounter()
 
@@ -41,22 +43,45 @@ class YoloStreamListener(tweepy.StreamListener):
     def __init__(self, directory,names_path,weights_path,config_path,confidence,threshold,api=None,limit=1000):
         super().__init__(api)
 
+        self.limit = limit
+        self.stop_flag = False
+
         self.LABELS = open(names_path).read().strip().split("\n")
         self.COLORS = np.random.randint(0,255,size=(len(self.LABELS),3),dtype="uint8")
 
         # Threads to process tweets from queue
-        num_worker_threads = 8
-        threads = []
+        num_worker_threads = 16
+        self.threads = []
         for i in range(num_worker_threads):
             t = TweetConsumerThread(directory,weights_path,config_path,confidence,threshold,self.COLORS,self.LABELS,limit)
             t.daemon = True
             t.start()
-            threads.append(t)
+            self.threads.append(t)
 
-        # TODO: A thread for writing to data.csv from consumers' outputs
+        # TODO: A thread for writing to data.csv from consumers' outputs - need to be careful on closing
+
+    def request_stop(self):
+        self.stop_flag = True
 
     # Producer - from twitter stream
     def on_status(self, status):
+        if cnt.getValue() > self.limit or self.stop_flag:
+            if cnt.getValue() > self.limit:
+                print("Tweet limit reached, stopping stream...")
+            if self.stop_flag:
+                print("Exiting stream...")
+            # Notify consumer threads to stop processing tweets
+            # Necessary - consumer threads call C code for YOLO, and may segfault if not properly closed
+            for t in self.threads:
+                t.request_stop()
+            # Disconnect stream once they all stop
+            for t in self.threads:
+                t.join()
+            if cnt.getValue() > self.limit:
+                print("Done. Press ENTER to exit.")
+            else:
+                print("Done")
+            return False   # Stop stream
         if not q.full():
             q.put(status)
 
@@ -81,20 +106,24 @@ class TweetConsumerThread(threading.Thread):
         self.COLORS = colors
         self.LABELS = labels
 
+        self.stop_flag = False
+
         # Load YOLO
         self.net = cv2.dnn.readNetFromDarknet(config_path,weights_path)
 
+    def request_stop(self):
+        self.stop_flag = True
+
     def run(self):
         while True:
+            if self.stop_flag:
+                return
             tweet = q.get()
-            if tweet is None:
-                break
-            if self.process_tweet(tweet):
-                curr_cnt = cnt.increment()
-                if curr_cnt % 25 is 0:
-                    print(str(curr_cnt) + " tweets downloaded")
-                if curr_cnt >= self.limit:
-                    _thread.interrupt_main() # kill program - downloaded enough tweets
+            if tweet is not None:
+                if self.process_tweet(tweet):
+                    curr_cnt = cnt.increment()
+                    if curr_cnt % 25 is 0:
+                        print(str(curr_cnt) + " tweets downloaded")
             q.task_done()
 
     def process_tweet(self, status):
@@ -191,50 +220,49 @@ class TweetConsumerThread(threading.Thread):
 
             csv_to_marked_image_file_path = os.path.join("data/images/",file_id + "marked.jpg")
 
-            # Write stuff to CSV
+            # Format data for writing to CSV
+            # Handle nullable objects in tweet
+            lon = ''
+            lat = ''
+            if status.coordinates is not None:
+                lon = status.coordinates["coordinates"][0]
+                lat = status.coordinates["coordinates"][1]
+            place_full_name = ''
+            place_type = ''
+            place_id = ''
+            place_url = ''
+            if status.place is not None:
+                place_full_name = status.place.full_name
+                place_type = status.place.place_type
+                place_id = status.place.id
+                place_url = status.place.url
+            # Handle getting full text of tweet (deals with truncation)
+            text = ''
             try:
+                if hasattr(status, 'extended_tweet'):
+                   text = status.extended_tweet['full_text']
+                else:
+                    text = status.text
+            except AttributeError:
+                print('attribute error: ' + status.text)
+
+            # Write to CSV
+            try:
+                csv_lock.acquire()
                 with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
                     writer = csv.writer(f)
-                    # Handle nullable objects in tweet
-                    lon = ''
-                    lat = ''
-                    if status.coordinates is not None:
-                        lon = status.coordinates["coordinates"][0]
-                        lat = status.coordinates["coordinates"][1]
-                    place_full_name = ''
-                    place_type = ''
-                    place_id = ''
-                    place_url = ''
-                    if status.place is not None:
-                        place_full_name = status.place.full_name
-                        place_type = status.place.place_type
-                        place_id = status.place.id
-                        place_url = status.place.url
-
-                    # Handle getting full text of tweet (deals with truncation)
-                    text = ''
-                    try:
-                        if hasattr(status, 'extended_tweet'):
-                           text = status.extended_tweet['full_text']
-                        else:
-                            text = status.text
-                    except AttributeError:
-                        print('attribute error: ' + status.text)
-
-                    # Finally write data to csv line
                     writer.writerow([status.user.id_str, status.id_str,text,csv_to_image_file_path,
                                 csv_to_marked_image_file_path,status.created_at,
                                 status.source,status.truncated,status.in_reply_to_status_id_str,status.in_reply_to_user_id_str,
                                 status.in_reply_to_screen_name,lon,lat,place_full_name,
                                 place_type,place_id,place_url,status.quote_count,status.reply_count,
                                 status.retweet_count,status.favorite_count,status.lang,csv_to_json_file_path])
-                    
-                    return True # Succesfully processed tweet
+                csv_lock.release()
+                return True # Succesfully processed tweet
             except OSError:
                 print(str(OSError) + "Error writing to CSV")
                 print("On tweet " +str(self.cnt))
                 return False 
-
 
 def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_path,confidence,threshold):
     print("yolo")
@@ -282,4 +310,8 @@ def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_
                                         confidence=confidence,threshold=threshold)
     stream = tweepy.Stream(auth=api.auth, listener=stream_listener,
                            tweet_mode='extended', stall_warnings=True)
-    stream.filter(track=tracking) # To unblock, asynch = True
+    stream.filter(track=tracking, is_async = True) # to unblock, is_async = True 
+
+    input("Press ENTER to exit stream at any time\n")
+
+    stream_listener.request_stop()
