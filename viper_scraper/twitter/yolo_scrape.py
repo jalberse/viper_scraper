@@ -8,35 +8,109 @@ import uuid
 import json
 import urllib.request
 import csv
+import threading
+import _thread
 
 from . import scraper as twitter_scraper
+
+q = queue.Queue() # tweet Queue - stream produces and threads consumer
+
+class AtomicCounter:
+    """
+    Thread-safe counter
+    """
+
+    def __init__(self,val=0):
+        self.value = val
+        self._lock = threading.Lock()
+
+    def increment(self,num=1):
+        with self._lock:
+            self.value += num
+            return self.value
+
+    def value():
+        return self.value
+
+cnt = AtomicCounter()
 
 class YoloStreamListener(tweepy.StreamListener):
     """
     Listen for data
     """
-    def __init__(self, directory,names_path,weights_path,config_path,confidence,threshold, api=None, limit=1000):
+    def __init__(self, directory,names_path,weights_path,config_path,confidence,threshold,api=None,limit=1000):
         super().__init__(api)
-        self.directory = directory
-        self.names_path=names_path
-        self.weights_path=weights_path
-        self.config_path=config_path
-        self.confidence=confidence
-        self.threshold=threshold
-        self.limit = limit
-        self.cnt = 0
 
-        # for marking up images
         self.LABELS = open(names_path).read().strip().split("\n")
         self.COLORS = np.random.randint(0,255,size=(len(self.LABELS),3),dtype="uint8")
+
+        # Threads to process tweets from queue
+        num_worker_threads = 8
+        threads = []
+        for i in range(num_worker_threads):
+            t = TweetConsumerThread(directory,weights_path,config_path,confidence,threshold,self.COLORS,self.LABELS,limit)
+            t.daemon = True
+            t.start()
+            threads.append(t)
+
+        # TODO: A thread for writing to data.csv from consumers' outputs
+
+    # Producer - from twitter stream
+    def on_status(self, status):
+        if not q.full():
+            q.put(status)
+        print(q.qsize())
+
+    def on_error(self, status_code):
+        if status_code == 420:
+            #returning False in on_data disconnects the stream
+            return False
+        return False
+
+class TweetConsumerThread(threading.Thread):
+    def __init__(self,directory,weights_path,config_path,confidence,threshold,colors,labels,limit,
+                    group=None,target=None,name=None,args=(),kwargs=None,verbose=None):
+        super().__init__()
+        self.directory = directory
+        self.config_path = config_path
+        self.confidence = confidence
+        self.threshold = threshold
+        self.target = target
+        self.name = name
+        self.limit = limit
+
+        self.COLORS = colors
+        self.LABELS = labels
 
         # Load YOLO
         self.net = cv2.dnn.readNetFromDarknet(config_path,weights_path)
 
-    def on_status(self, status):
+    def run(self):
+        while True:
+            tweet = q.get()
+            if tweet is None:
+                break
+            if self.process_tweet(tweet):
+                curr_cnt = cnt.increment()
+                if curr_cnt % 25 is 0:
+                    print(str(curr_cnt) + " tweets downloaded")
+                if curr_cnt >= self.limit:
+                    _thread.interrupt_main() # kill program - downloaded enough tweets
+            q.task_done()
+
+    def process_tweet(self, status):
+        """
+        If a tweet contains an image: downloads image, marks up with YOLO, saves
+        tweet data, images, confidences
+
+        Returns True if downloaded an image
+        Returns False if tweet did not contain an image or was a RT
+        """
         if status.text.startswith('RT'):
-            return True # Ignore RTs to avoid repeat data
+            return False # Ignore RTs to avoid repeat data
         media_urls, _ = twitter_scraper.get_media_urls(status)
+        if len(media_urls) == 0:
+            return False # No images to download
         csv_to_image_file_path = ''
         for url in media_urls:
             file_id = uuid.uuid4().hex
@@ -44,13 +118,14 @@ class YoloStreamListener(tweepy.StreamListener):
             try:
                 urllib.request.urlretrieve(url, filename)
             except Exception as e:
-                print(e)
-                return True # skip this tweet but continue streaming
+                print(e)    # likely HTTP error - user deleted images etc
+                return False # skip this tweet but continue streaming
             csv_to_image_file_path = os.path.join("data/images/",file_id + ".jpg")
 
             # We have local file - now run it through YOLO
             # this code derived from
             # https://www.pyimagesearch.com/2018/11/12/yolo-object-detection-with-opencv/
+
             image = cv2.imread(filename)
             (H, W) = image.shape[:2]
 
@@ -90,7 +165,7 @@ class YoloStreamListener(tweepy.StreamListener):
                     (x,y) = (bounding_boxes[i][0], bounding_boxes[i][1])
                     (w,h) = (bounding_boxes[i][2], bounding_boxes[i][3])
                     color = [int(c) for c in self.COLORS[labels[i]]]
-                    cv2.rectangle(image, (x,y), (x + w, y + h),color, 2)
+                    cv2.rectangle(img=image, pt1=(x,y), pt2=(x + w, y + h),color=color, thickness=2)
                     text = "{}: {:.4f}".format(self.LABELS[labels[i]], confidences[i])
                     cv2.putText(image,text,(x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
@@ -102,10 +177,9 @@ class YoloStreamListener(tweepy.StreamListener):
 
             if len(idxs) > 0:
                 for i in idxs.flatten():
-                    # TODO append the confidence to the label's associated array
                     detected[self.LABELS[labels[i]]].append(confidences[i])
                 
-            # save this data to disk
+            # save json file to disk
             filename_json = os.path.join(self.directory,'data/images/',file_id + ".json")
             with open(filename_json,'w') as f:
                 json.dump(detected,f)
@@ -118,7 +192,6 @@ class YoloStreamListener(tweepy.StreamListener):
 
             csv_to_marked_image_file_path = os.path.join("data/images/",file_id + "marked.jpg")
 
-            # TODO place file location of confidences JSON file into csv
             # Write stuff to CSV
             try:
                 with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
@@ -149,10 +222,6 @@ class YoloStreamListener(tweepy.StreamListener):
                     except AttributeError:
                         print('attribute error: ' + status.text)
 
-                    self.cnt = self.cnt + 1
-                    if self.cnt % 25 is 0:
-                        print(str(self.cnt) + " tweets downloaded")
-
                     # Finally write data to csv line
                     writer.writerow([status.user.id_str, status.id_str,text,csv_to_image_file_path,
                                 csv_to_marked_image_file_path,status.created_at,
@@ -160,16 +229,13 @@ class YoloStreamListener(tweepy.StreamListener):
                                 status.in_reply_to_screen_name,lon,lat,place_full_name,
                                 place_type,place_id,place_url,status.quote_count,status.reply_count,
                                 status.retweet_count,status.favorite_count,status.lang,csv_to_json_file_path])
+                    
+                    return True # Succesfully processed tweet
             except OSError:
                 print(str(OSError) + "Error writing to CSV")
                 print("On tweet " +str(self.cnt))
                 return False 
 
-    def on_error(self, status_code):
-        if status_code == 420:
-            #returning False in on_data disconnects the stream
-            return False
-        return False
 
 def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_path,confidence,threshold):
     print("yolo")
