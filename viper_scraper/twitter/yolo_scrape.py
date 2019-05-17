@@ -13,7 +13,9 @@ import _thread
 
 from . import scraper as twitter_scraper
 
-q = queue.Queue(maxsize=10000) # tweet Queue - stream produces and threads consumer
+MAX_QUEUE_SIZE = 10000
+
+q = queue.Queue(maxsize=MAX_QUEUE_SIZE) # tweet Queue - stream produces and threads consumer
 csv_lock = threading.Lock()    # Lock for data.csv
 
 #TODO this belongs in a utility file
@@ -67,13 +69,14 @@ class YoloStreamListener(tweepy.StreamListener):
     def on_status(self, status):
         if cnt.getValue() > self.limit or self.stop_flag:
             if cnt.getValue() > self.limit:
-                print("Tweet limit reached, stopping stream...")
+                print("Tweet limit reached, exiting stream (consuming queue)...")
             if self.stop_flag:
-                print("Exiting stream...")
+                print("Exiting stream (consuming queue)...")
             # Notify consumer threads to stop processing tweets
             # Necessary - consumer threads call C code for YOLO, and may segfault if not properly closed
+            # TODO: Sometimes this blocks - figure out why
             for t in self.threads:
-                t.request_stop()
+                q.put(None) # tell consumers we are done
             # Disconnect stream once they all stop
             for t in self.threads:
                 t.join()
@@ -106,24 +109,19 @@ class TweetConsumerThread(threading.Thread):
         self.COLORS = colors
         self.LABELS = labels
 
-        self.stop_flag = False
-
         # Load YOLO
         self.net = cv2.dnn.readNetFromDarknet(config_path,weights_path)
 
-    def request_stop(self):
-        self.stop_flag = True
-
     def run(self):
         while True:
-            if self.stop_flag:
-                return
             tweet = q.get()
-            if tweet is not None:
-                if self.process_tweet(tweet):
-                    curr_cnt = cnt.increment()
-                    if curr_cnt % 25 is 0:
-                        print(str(curr_cnt) + " tweets downloaded")
+            if tweet is None: # Producer has indicated we are done
+                break
+            if self.process_tweet(tweet): # if an image was downloaded
+                curr_cnt = cnt.increment()
+                if curr_cnt % 25 is 0:
+                    print(str(curr_cnt) + " tweets downloaded")
+                    print(str(q.qsize()) + " tweets in queue")
             q.task_done()
 
     def process_tweet(self, status):
@@ -265,7 +263,6 @@ class TweetConsumerThread(threading.Thread):
                 return False 
 
 def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_path,confidence,threshold):
-    print("yolo")
     api = twitter_scraper.get_api()
 
     if not os.path.exists(dir_prefix):

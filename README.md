@@ -51,7 +51,7 @@ python viper_scraper.py yolo [-h] [-d Data Directory] [-t Tracking File] [-n NUM
 
 `-t Tracking File` : The path to the tracking file. This file contains a list of phrases, one per line, used to filter the Twitter stream. See [Filter realtime Tweets](https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html) for more information or see config/plane_tracking.txt for an example.
 
-`-n NUMBER` : The number of images to scrape.
+`-n NUMBER` : Approximate number of images to scrape (acts as a minimum, actual in range [n, n + maxqueuesize]. See yolo_scrape.py)
 
 `--names NAMES` : A file containing the names, one per line, associated with the weights and config file for YOLO, e.g. [coco.names](https://github.com/pjreddie/darknet/blob/master/data/coco.names).
 

@@ -73,7 +73,7 @@ def main():
                         " YOLO is applied to tweets from the resultant stream." +
                         " see https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html")
     parser_yolo.add_argument('-n', '--number', type=int, default=0,
-                        help='Number of images to download')
+                        help='Approximate number of images to download')
     # now params for actual YOLO model
     parser_yolo.add_argument('--names', required=True,
                         help="path to names file")
