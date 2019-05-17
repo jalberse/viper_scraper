@@ -32,7 +32,7 @@ class AtomicCounter:
             self.value += num
             return self.value
 
-    def getValue(self):
+    def get_value(self):
         with self._lock:
             return self.value
 
@@ -67,8 +67,8 @@ class YoloStreamListener(tweepy.StreamListener):
 
     # Producer - from twitter stream
     def on_status(self, status):
-        if cnt.getValue() > self.limit or self.stop_flag:
-            if cnt.getValue() > self.limit:
+        if cnt.get_value() > self.limit or self.stop_flag:
+            if cnt.get_value() > self.limit:
                 print("Tweet limit reached, exiting stream (consuming queue)...")
             if self.stop_flag:
                 print("Exiting stream (consuming queue)...")
@@ -80,7 +80,7 @@ class YoloStreamListener(tweepy.StreamListener):
             # Disconnect stream once they all stop
             for t in self.threads:
                 t.join()
-            if cnt.getValue() > self.limit:
+            if cnt.get_value() > self.limit:
                 print("Done. Press ENTER to exit.")
             else:
                 print("Done")
