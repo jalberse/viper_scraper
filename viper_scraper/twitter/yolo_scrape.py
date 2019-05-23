@@ -52,7 +52,7 @@ class YoloStreamListener(tweepy.StreamListener):
         self.COLORS = np.random.randint(0,255,size=(len(self.LABELS),3),dtype="uint8")
 
         # Threads to process tweets from queue
-        num_worker_threads = 16
+        num_worker_threads = 8
         self.threads = []
         for i in range(num_worker_threads):
             t = TweetConsumerThread(directory,weights_path,config_path,confidence,threshold,self.COLORS,self.LABELS,limit)
@@ -73,8 +73,7 @@ class YoloStreamListener(tweepy.StreamListener):
             if self.stop_flag:
                 print("Exiting stream (consuming queue)...")
             # Notify consumer threads to stop processing tweets
-            # Necessary - consumer threads call C code for YOLO, and may segfault if not properly closed
-            # TODO: Sometimes this blocks - figure out why
+            # TODO: Sometimes this still blocks - figure out why
             for t in self.threads:
                 q.put(None) # tell consumers we are done
             # Disconnect stream once they all stop
@@ -114,7 +113,7 @@ class TweetConsumerThread(threading.Thread):
 
     def run(self):
         while True:
-            tweet = q.get()
+            tweet = q.get() # blocks until queue has an item in it
             if tweet is None: # Producer has indicated we are done
                 break
             if self.process_tweet(tweet): # if an image was downloaded
@@ -300,15 +299,25 @@ def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_
     except OSError:
         print("Could not create data.csv")
 
-    print("Starting stream...")
-
     stream_listener = YoloStreamListener(directory=twitter_dir,limit=limit,names_path=names_path,
                                         weights_path=weights_path,config_path=config_path,
                                         confidence=confidence,threshold=threshold)
-    stream = tweepy.Stream(auth=api.auth, listener=stream_listener,
-                           tweet_mode='extended', stall_warnings=True)
-    stream.filter(track=tracking, is_async = True) # to unblock, is_async = True 
 
-    input("Press ENTER to exit stream at any time\n")
+    print("Starting stream...")
+
+    while cnt.get_value() < limit:
+        try:
+            stream = tweepy.Stream(auth=api.auth, listener=stream_listener,
+                                   tweet_mode='extended', stall_warnings=True)
+            stream.filter(track=tracking, is_async = True) # to unblock, is_async = True
+            print("Stream connected")
+            input("Press ENTER to exit stream at any time\n")
+                # Blocking - if ENTER is pressed, will break from loop and request stream_listener
+                # to stop. If ENTER is not pressed and an error occurs, the stream will reconnect
+            break
+        except Exception as e:
+            print(e)
+            print("Error occured, reconnecting stream...")
+            continue
 
     stream_listener.request_stop()

@@ -48,7 +48,7 @@ def simple_term_frequency_generator(data_filtered):
     # Use to grab the top n terms and save to file
     top_features = [feature_names[i] for i in indices[:n]]
     print(top_features)
-    with open('topn.txt', 'w') as f:
+    with open('topn_generated.txt', 'w') as f:
         for word in top_features:
             f.write(word + '\n')
 
@@ -108,7 +108,7 @@ def normalized_relative_term_frequency_generator(data_filtered):
 
     print(top_features)
 
-    with open('topn.txt', 'w') as f:
+    with open('topn_generated.txt', 'w') as f:
         for word in top_features:
             f.write(word + '\n')
 
@@ -131,11 +131,11 @@ def tfidf_generator(data_filtered):
     n = 400
     # Grab top n features
     top_features = [feature_names[i] for i in indices[:n]]
-    with open('topn.txt', 'w') as f:
+    with open('topn_generated.txt', 'w') as f:
         for word in top_features:
             f.write(word + '\n')
 
-# TODO: Simple frequency (with stop words) file generation
+
 
 # Partitioning data and cleaning text before sending to file generation fns
 def trending_phrases(csv_filename):
