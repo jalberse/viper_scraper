@@ -261,16 +261,6 @@ class TweetConsumerThread(threading.Thread):
                 print("On tweet " +str(self.cnt))
                 return False 
 
-    def run_yolo(self, filename):
-        '''
-        Runs image specified by filename through YOLO
-        Saves image with bounding box, JSON with confidences
-        returns tuple (csv_to_json_filepath,csv_to_marked_image_filepath)
-        '''
-
-        
-
-
 def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_path,confidence,threshold):
     api = twitter_scraper.get_api()
 
