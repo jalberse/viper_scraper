@@ -138,87 +138,20 @@ class TweetConsumerThread(threading.Thread):
             return False # No images to download
         csv_to_image_file_path = ''
         for url in media_urls:
+            # Download image with unique filename - this ID is used for json and marked image as well
             file_id = uuid.uuid4().hex
             filename = os.path.join(self.directory,'data/images/', file_id + ".jpg")
             try:
                 urllib.request.urlretrieve(url, filename)
             except Exception as e:
-                print(e)    # likely HTTP error - user deleted images etc
+                print(e)    # likely HTTP error - user deleted image etc
                 return False # skip this tweet but continue streaming
-            csv_to_image_file_path = os.path.join("data/images/",file_id + ".jpg")
+            csv_to_image_file_path = os.path.join("data/images/",file_id + ".jpg") # for saving file location in CSV
 
-            # We have local file - now run it through YOLO
-            # this code derived from
-            # https://www.pyimagesearch.com/2018/11/12/yolo-object-detection-with-opencv/
-
-            image = cv2.imread(filename)
-            (H, W) = image.shape[:2]
-
-            ln = self.net.getLayerNames()
-            ln = [ln[i[0] -1] for i in self.net.getUnconnectedOutLayers()]
-
-            blob = cv2.dnn.blobFromImage(image, 1/ 255.0, (416, 416), swapRB=True, crop=False)
-            self.net.setInput(blob)
-            layerOutputs=self.net.forward(ln)
-
-            bounding_boxes = []
-            confidences = []
-            labels = []
-
-            for output in layerOutputs:
-                for detection in output:
-                    scores = detection[5:]
-                    label = np.argmax(scores)
-                    confidence = scores[label]
-
-                    if (confidence > self.confidence):
-                        box = detection[0:4] * np.array([W,H,W,H])
-                        (center_x,center_y,width,height) = box.astype("int")
-                        x = int(center_x - (width / 2))
-                        y = int(center_y - (height / 2))
-
-                        bounding_boxes.append([x,y,int(width),int(height)])
-                        confidences.append(float(confidence))
-                        labels.append(label)
+            # Run image through YOLO and save image with bounding boxes and JSON file with confidences
+            csv_to_json_file_path, csv_to_marked_image_file_path = self.run_yolo(filename,file_id)
             
-            # non-maxima suppression
-            idxs = cv2.dnn.NMSBoxes(bounding_boxes, confidences, self.confidence, self.threshold)
-
-            # draw the bounding boxes for the marked up version of the image
-            if len(idxs) > 0:
-                for i in idxs.flatten():
-                    (x,y) = (bounding_boxes[i][0], bounding_boxes[i][1])
-                    (w,h) = (bounding_boxes[i][2], bounding_boxes[i][3])
-                    color = [int(c) for c in self.COLORS[labels[i]]]
-                    cv2.rectangle(img=image, pt1=(x,y), pt2=(x + w, y + h),color=color, thickness=2)
-                    text = "{}: {:.4f}".format(self.LABELS[labels[i]], confidences[i])
-                    cv2.putText(image,text,(x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-
-            # create a dict of labels:[confidences]
-            # populate dict with ALL labels associated with empty arrays
-            detected = {}
-            for l in self.LABELS:
-                detected[l] = []
-
-            if len(idxs) > 0:
-                for i in idxs.flatten():
-                    detected[self.LABELS[labels[i]]].append(confidences[i])
-                
-            # save json file to disk
-            filename_json = os.path.join(self.directory,'data/images/',file_id + ".json")
-            with open(filename_json,'w') as f:
-                json.dump(detected,f)
-
-            csv_to_json_file_path = os.path.join('data/images/',file_id + ".json")
-            
-            # Save the image with bounding boxes to disk
-            filename_marked = os.path.join(self.directory,'data/images/', file_id + "_marked.jpg")
-            cv2.imwrite(filename_marked, image)
-
-            csv_to_marked_image_file_path = os.path.join("data/images/",file_id + "marked.jpg")
-
             # Format data for writing to CSV
-            # Handle nullable objects in tweet
             lon = ''
             lat = ''
             if status.coordinates is not None:
@@ -233,7 +166,8 @@ class TweetConsumerThread(threading.Thread):
                 place_type = status.place.place_type
                 place_id = status.place.id
                 place_url = status.place.url
-            # Handle getting full text of tweet (deals with truncation)
+
+            # Get full text of tweet (deals with truncation)
             text = ''
             try:
                 if hasattr(status, 'extended_tweet'):
@@ -248,18 +182,97 @@ class TweetConsumerThread(threading.Thread):
                 csv_lock.acquire()
                 with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
                     writer = csv.writer(f)
-                    writer.writerow([status.user.id_str, status.id_str,text,csv_to_image_file_path,
-                                csv_to_marked_image_file_path,status.created_at,
+                    writer.writerow([status.user.id_str,status.id_str,text,csv_to_image_file_path,
+                                csv_to_marked_image_file_path,csv_to_json_file_path,status.created_at,
                                 status.source,status.truncated,status.in_reply_to_status_id_str,status.in_reply_to_user_id_str,
                                 status.in_reply_to_screen_name,lon,lat,place_full_name,
                                 place_type,place_id,place_url,status.quote_count,status.reply_count,
-                                status.retweet_count,status.favorite_count,status.lang,csv_to_json_file_path])
+                                status.retweet_count,status.favorite_count,status.lang])
                 csv_lock.release()
                 return True # Succesfully processed tweet
             except OSError:
                 print(str(OSError) + "Error writing to CSV")
                 print("On tweet " +str(self.cnt))
                 return False 
+
+    def run_yolo(self, filename, file_id):
+        '''
+        Runs image specified by filename through YOLO
+        Saves image with bounding box, JSON with confidences
+        returns tuple (csv_to_json_filepath,csv_to_marked_image_filepath)
+        '''
+        # We have local file - now run it through YOLO
+        # this code derived from
+        # https://www.pyimagesearch.com/2018/11/12/yolo-object-detection-with-opencv/
+
+        image = cv2.imread(filename)
+        (H, W) = image.shape[:2]
+
+        ln = self.net.getLayerNames()
+        ln = [ln[i[0] -1] for i in self.net.getUnconnectedOutLayers()]
+
+        blob = cv2.dnn.blobFromImage(image, 1/ 255.0, (416, 416), swapRB=True, crop=False)
+        self.net.setInput(blob)
+        layerOutputs=self.net.forward(ln)
+
+        bounding_boxes = []
+        confidences = []
+        labels = []
+
+        for output in layerOutputs:
+            for detection in output:
+                scores = detection[5:]
+                label = np.argmax(scores)
+                confidence = scores[label]
+
+                if (confidence > self.confidence):
+                    box = detection[0:4] * np.array([W,H,W,H])
+                    (center_x,center_y,width,height) = box.astype("int")
+                    x = int(center_x - (width / 2))
+                    y = int(center_y - (height / 2))
+                    bounding_boxes.append([x,y,int(width),int(height)])
+                    confidences.append(float(confidence))
+                    labels.append(label)
+            
+        # non-maxima suppression
+        idxs = cv2.dnn.NMSBoxes(bounding_boxes, confidences, self.confidence, self.threshold)
+
+        # draw the bounding boxes for the marked up version of the image
+        if len(idxs) > 0:
+            for i in idxs.flatten():
+                (x,y) = (bounding_boxes[i][0], bounding_boxes[i][1])
+                (w,h) = (bounding_boxes[i][2], bounding_boxes[i][3])
+                color = [int(c) for c in self.COLORS[labels[i]]]
+                cv2.rectangle(img=image, pt1=(x,y), pt2=(x + w, y + h),color=color, thickness=2)
+                text = "{}: {:.4f}".format(self.LABELS[labels[i]], confidences[i])
+                cv2.putText(image,text,(x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+        # create a dict of labels:[confidences]
+        # populate dict with ALL labels associated with empty arrays
+        detected = {}
+        for l in self.LABELS:
+            detected[l] = []
+
+        if len(idxs) > 0:
+            for i in idxs.flatten():
+                detected[self.LABELS[labels[i]]].append(confidences[i])
+                
+        # save json file to disk
+        filename_json = os.path.join(self.directory,'data/confidences/',file_id + ".json")
+        with open(filename_json,'w') as f:
+            json.dump(detected,f)
+
+        csv_to_json_file_path = os.path.join('data/images/',file_id + ".json")
+            
+        # Save the image with bounding boxes to disk
+        filename_marked = os.path.join(self.directory,'data/images/', file_id + "_marked.jpg")
+        cv2.imwrite(filename_marked, image)
+
+        csv_to_marked_image_file_path = os.path.join("data/images/",file_id + "marked.jpg")
+
+        return csv_to_json_file_path, csv_to_marked_image_file_path
+
+
 
 def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_path,confidence,threshold):
     api = twitter_scraper.get_api()
@@ -277,6 +290,10 @@ def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_
     if not os.path.exists(images_dir):
         os.makedirs(images_dir)
 
+    confidences_dir = os.path.join(twitter_dir,'data/confidences/')
+    if not os.path.exists(confidences_dir):
+        os.makedirs(confidences_dir)
+
     # Create tracking param
     try:
         with open(tracking_file, 'r') as f:
@@ -291,11 +308,11 @@ def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_
         with open(filename, 'a+') as f:
             writer = csv.writer(f)
             if os.path.getsize(filename) == 0:
-                writer.writerow(['user_id', 'tweet_id', 'text','image_file','marked_up_image_file',
+                writer.writerow(['user_id', 'tweet_id', 'text','image_file','marked_up_image_file','csv_to_json_file_path',
                     'created_at','source','truncated','in_reply_to_status_id',
                     'in_reply_to_user_id','in_reply_to_screen_name','longitude','latitude',
                     'place_full_name','place_type','place_id','place_url','quote_count',
-                    'reply_count','retweet_count','favorite_count','lang','detected_file'])
+                    'reply_count','retweet_count','favorite_count','lang'])
     except OSError:
         print("Could not create data.csv")
 
