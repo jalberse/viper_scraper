@@ -15,8 +15,16 @@ from . import scraper as twitter_scraper
 
 MAX_QUEUE_SIZE = 10000
 
-q = queue.Queue(maxsize=MAX_QUEUE_SIZE) # tweet Queue - stream produces and threads consumer
-csv_lock = threading.Lock()    # Lock for data.csv
+# TODO: Go through code and change all the previous self.LABELS etc to self.yolo.LABELS... ugh
+class Yolo:
+    def __init__(self,names_path,weights_path,config_path,confidence,threshold):
+        self.LABELS = open(names_path).read().strip().split("\n")
+        self.COLORS = np.random.randint(0,255,size=(len(self.LABELS),3),dtype="uint8")
+        self.confidence = confidence
+        self.threshold = threshold
+        self.config_path = config_path
+        self.weights_path = weights_path
+
 
 #TODO this belongs in a utility file
 class AtomicCounter:
@@ -36,26 +44,28 @@ class AtomicCounter:
         with self._lock:
             return self.value
 
-cnt = AtomicCounter()
+cnt = AtomicCounter()                   # Count number of tweets or images downloaded
+q = queue.Queue(maxsize=MAX_QUEUE_SIZE) # tweet Queue
+csv_lock = threading.Lock()             # Lock for data.csv
 
 class YoloStreamListener(tweepy.StreamListener):
     """
     Listen for data
     """
-    def __init__(self, directory,names_path,weights_path,config_path,confidence,threshold,api=None,limit=1000):
+    def __init__(self,directory,yolo=None,api=None,limit=1000):
         super().__init__(api)
+        # TODO: Allow user to specify if they want to limit by number of tweets or number of photos (and time?)
 
         self.limit = limit
         self.stop_flag = False
 
-        self.LABELS = open(names_path).read().strip().split("\n")
-        self.COLORS = np.random.randint(0,255,size=(len(self.LABELS),3),dtype="uint8")
+        self.yolo = yolo
 
         # Threads to process tweets from queue
         num_worker_threads = 8
         self.threads = []
         for i in range(num_worker_threads):
-            t = TweetConsumerThread(directory,weights_path,config_path,confidence,threshold,self.COLORS,self.LABELS,limit)
+            t = TweetConsumerThread(directory,limit,self.yolo)
             t.daemon = True
             t.start()
             self.threads.append(t)
@@ -94,22 +104,13 @@ class YoloStreamListener(tweepy.StreamListener):
         return False
 
 class TweetConsumerThread(threading.Thread):
-    def __init__(self,directory,weights_path,config_path,confidence,threshold,colors,labels,limit,
-                    group=None,target=None,name=None,args=(),kwargs=None,verbose=None):
+    def __init__(self,directory,limit,yolo=None):
         super().__init__()
         self.directory = directory
-        self.config_path = config_path
-        self.confidence = confidence
-        self.threshold = threshold
-        self.target = target
-        self.name = name
         self.limit = limit
-
-        self.COLORS = colors
-        self.LABELS = labels
-
-        # Load YOLO
-        self.net = cv2.dnn.readNetFromDarknet(config_path,weights_path)
+        self.yolo = yolo
+        if yolo is not None:
+            self.net = cv2.dnn.readNetFromDarknet(self.yolo.config_path,self.yolo.weights_path)
 
     def run(self):
         while True:
@@ -133,7 +134,13 @@ class TweetConsumerThread(threading.Thread):
         """
         if status.text.startswith('RT'):
             return False # Ignore RTs to avoid repeat data
-        media_urls, _ = twitter_scraper.get_media_urls(status)
+        # TODO: Use extended_entities for media URLs instead! 
+        #       Have 4 columns for each tweet (image, marked image, JSON)
+        #       Since 4 is maximum number of media files.
+        #       Will also probably now return -1/0/1/2/3/4 now instead for counting pics... 
+        # TODO: This will require a rework of tracking_generation.py - probably just is_above_threshold
+        #       Which now will check all photos in a tweet, and obviously how we read those confidences in
+        media_urls, _ = get_media_urls(status)
         if len(media_urls) == 0:
             return False # No images to download
         csv_to_image_file_path = ''
@@ -148,8 +155,10 @@ class TweetConsumerThread(threading.Thread):
                 return False # skip this tweet but continue streaming
             csv_to_image_file_path = os.path.join("data/images/",file_id + ".jpg") # for saving file location in CSV
 
-            # Run image through YOLO and save image with bounding boxes and JSON file with confidences
-            csv_to_json_file_path, csv_to_marked_image_file_path = self.run_yolo(filename,file_id)
+            # If using YOLO, run image through YOLO and save image with bounding boxes and JSON file with confidences
+            csv_to_json_file_path, csv_to_marked_image_file_path = '',''
+            if self.yolo is not None:
+                csv_to_json_file_path, csv_to_marked_image_file_path = self.run_yolo(filename,file_id)
             
             # Format data for writing to CSV
             lon = ''
@@ -225,7 +234,7 @@ class TweetConsumerThread(threading.Thread):
                 label = np.argmax(scores)
                 confidence = scores[label]
 
-                if (confidence > self.confidence):
+                if (confidence > self.yolo.confidence):
                     box = detection[0:4] * np.array([W,H,W,H])
                     (center_x,center_y,width,height) = box.astype("int")
                     x = int(center_x - (width / 2))
@@ -235,27 +244,27 @@ class TweetConsumerThread(threading.Thread):
                     labels.append(label)
             
         # non-maxima suppression
-        idxs = cv2.dnn.NMSBoxes(bounding_boxes, confidences, self.confidence, self.threshold)
+        idxs = cv2.dnn.NMSBoxes(bounding_boxes, confidences, self.yolo.confidence, self.yolo.threshold)
 
         # draw the bounding boxes for the marked up version of the image
         if len(idxs) > 0:
             for i in idxs.flatten():
                 (x,y) = (bounding_boxes[i][0], bounding_boxes[i][1])
                 (w,h) = (bounding_boxes[i][2], bounding_boxes[i][3])
-                color = [int(c) for c in self.COLORS[labels[i]]]
+                color = [int(c) for c in self.yolo.COLORS[labels[i]]]
                 cv2.rectangle(img=image, pt1=(x,y), pt2=(x + w, y + h),color=color, thickness=2)
-                text = "{}: {:.4f}".format(self.LABELS[labels[i]], confidences[i])
+                text = "{}: {:.4f}".format(self.yolo.LABELS[labels[i]], confidences[i])
                 cv2.putText(image,text,(x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
         # create a dict of labels:[confidences]
         # populate dict with ALL labels associated with empty arrays
         detected = {}
-        for l in self.LABELS:
+        for l in self.yolo.LABELS:
             detected[l] = []
 
         if len(idxs) > 0:
             for i in idxs.flatten():
-                detected[self.LABELS[labels[i]]].append(confidences[i])
+                detected[self.yolo.LABELS[labels[i]]].append(confidences[i])
                 
         # save json file to disk
         filename_json = os.path.join(self.directory,'data/confidences/',file_id + ".json")
@@ -272,10 +281,8 @@ class TweetConsumerThread(threading.Thread):
 
         return csv_to_json_file_path, csv_to_marked_image_file_path
 
-
-
-def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_path,confidence,threshold):
-    api = twitter_scraper.get_api()
+def stream_scrape(dir_prefix,tracking,limit,yolo):
+    api = get_api()
 
     if not os.path.exists(dir_prefix):
         os.makedirs(dir_prefix)
@@ -294,14 +301,6 @@ def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_
     if not os.path.exists(confidences_dir):
         os.makedirs(confidences_dir)
 
-    # Create tracking param
-    try:
-        with open(tracking_file, 'r') as f:
-            tracking = f.read().splitlines()
-    except OSError:
-        print("Error opening tracking.txt")
-        return
-
     # CSV file - create and write header if necessary
     try:
         filename = os.path.join(twitter_dir,'data.csv')
@@ -316,9 +315,7 @@ def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_
     except OSError:
         print("Could not create data.csv")
 
-    stream_listener = YoloStreamListener(directory=twitter_dir,limit=limit,names_path=names_path,
-                                        weights_path=weights_path,config_path=config_path,
-                                        confidence=confidence,threshold=threshold)
+    stream_listener = YoloStreamListener(directory=twitter_dir,limit=limit,yolo=yolo)
 
     print("Starting stream...")
 
@@ -338,3 +335,48 @@ def stream_scrape(dir_prefix,tracking_file,limit,weights_path,config_path,names_
             continue
 
     stream_listener.request_stop()
+
+
+#####################
+# Utility functions #
+#####################
+
+def get_api():
+    """
+    Handles OAuth and returns the tweepy API
+    """
+    try:
+        ## TODO: Fix paths for best practice compliance
+        if os.path.isfile(".my_keys"):
+            keys_file = open(".my_keys", 'r')
+        else:
+            keys_file = open("config/keys.json", 'r')
+    except OSError:
+        print("Error opening keys file")
+
+    keys = json.load(keys_file)
+
+    consumer_key = keys['websites']['Twitter']['consumer_key']
+    consumer_secret = keys['websites']['Twitter']['consumer_secret']
+    access_token = keys['websites']['Twitter']['access_token']
+    access_token_secret = keys['websites']['Twitter']['access_secret']
+
+    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_token, access_token_secret)
+
+    return tweepy.API(auth_handler=auth, wait_on_rate_limit=True,
+                      wait_on_rate_limit_notify=True)
+
+def get_media_urls(tweet):
+    """
+    Returns the set of media urls for a given tweet
+    """
+    media_urls = set()
+    media = tweet.entities.get('media', [])
+    cnt = 0
+    if len(media) > 0:
+        for i in range(0, len(media)):
+            if media[i]['type'] == 'photo':
+                media_urls.add(media[i]['media_url'])
+                cnt = cnt + 1
+    return media_urls, cnt

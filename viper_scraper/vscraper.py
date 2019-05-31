@@ -22,22 +22,19 @@ def main():
     # Twitter parsg
     parser_twit = subparsers.add_parser('twitter', help = 'This scraper is based on the twitter streaming API.'
                                                           ' twitter --help for more information.')
-    parser_twit.add_argument('-n', '--number', type=int, default=DEFAULT_NUMBER,
-                        dest='number', metavar='Number',
-                        help="If photos as limit is true, the number of images to "
-                        + "scrape. Else the number of posts to scrape.")
+    parser_twit.add_argument('-d','--dir_prefix',dest='data_directory',metavar="Data Directory",
+                        default='./data/',
+                        help="directory to save results")
     parser_twit.add_argument('-t', '--tracking', dest='tracking_file', metavar='Tracking File',
                         default='metadata/tracking.txt',
                         help="Path to a text file containing a list of phrases, one per line, to track." +
                         " see https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html")
-    parser_twit.add_argument('-d','--dir_prefix',dest='data_directory',metavar="Data Directory",
-                        default='./data/',
-                        help="directory to save results")
-    parser_twit.add_argument('--photo_limit', dest='photos_act_as_limiter', action='store_true',
-                        help="number refers to number of photos, not tweets. This is the default.")
-    parser_twit.add_argument('--status_limit', dest='photos_act_as_limiter', action='store_false',
-                        help="number refers to number of tweets, not photos")
-    parser_twit.set_defaults(photos_act_as_limiter=True)
+    parser_twit.add_argument('-n', '--number', type=int, default=DEFAULT_NUMBER,
+                        dest='number', metavar='Number',
+                        help="If photos as limit is true, the number of images to "
+                        + "scrape. Else the number of posts to scrape.")
+    
+    
     parser_twit.set_defaults(func=twitter)
 
     # Instagram parsing
@@ -101,20 +98,32 @@ def instagram(args):
                   authentication=args.authentication)
 
 def twitter(args):
-    tscraper.stream_scrape(tracking_file=args.tracking_file,directory=args.data_directory,
-                           number=args.number,photos_act_as_limiter=args.photos_act_as_limiter)
+    # Scrape twitter w/out YOLO
+    tracking = get_tracking(args.tracking_file)
+    yolo_scraper.stream_scrape(dir_prefix=args.data_directory,tracking=tracking,limit=args.number,yolo=None)
 
 
 def yolo(args):
-    yolo_scraper.stream_scrape(dir_prefix=args.dir_prefix,
-                               tracking_file=args.tracking_file,
-                               limit=args.number,
-                               names_path=args.names,
-                               weights_path=args.weights,
-                               config_path=args.config,
-                               confidence=args.confidence,
-                               threshold=args.threshold)
+    # Scrape twitter w/ YOLO processing
+    tracking = get_tracking(args.tracking_file)
+    yolo_config = yolo_scraper.Yolo(names_path=args.names,
+                                    weights_path=args.weights,
+                                    config_path=args.config,
+                                    confidence=args.confidence,
+                                    threshold=args.threshold)
+
+    yolo_scraper.stream_scrape(dir_prefix=args.dir_prefix,tracking=tracking,limit=args.number,yolo=yolo_config)
     
+def get_tracking(filename):
+    try:
+        with open(filename, 'r') as f:
+            tracking = f.read().splitlines()
+    except OSError:
+        print("Error opening tracking.txt")
+        return None
+    return tracking
+
+
 
 if __name__ == "__main__":
     main()
