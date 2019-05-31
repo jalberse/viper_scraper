@@ -143,66 +143,70 @@ class TweetConsumerThread(threading.Thread):
         media_urls, _ = get_media_urls(status)
         if len(media_urls) == 0:
             return False # No images to download
+
+        image_paths = ['' for i in range (4)]
+        marked_image_paths = ['' for i in range (4)]
+        confidence_json_paths = ['' for i in range (4)]
+
         csv_to_image_file_path = ''
-        for url in media_urls:
+        for i, url in enumerate(media_urls):
             # Download image with unique filename - this ID is used for json and marked image as well
             file_id = uuid.uuid4().hex
             filename = os.path.join(self.directory,'data/images/', file_id + ".jpg")
             try:
                 urllib.request.urlretrieve(url, filename)
             except Exception as e:
-                print(e)    # likely HTTP error - user deleted image etc
-                return False # skip this tweet but continue streaming
-            csv_to_image_file_path = os.path.join("data/images/",file_id + ".jpg") # for saving file location in CSV
+                print(e)     # likely HTTP error - user deleted image etc
+                return False # skip this tweet
+
+            image_paths[i] = os.path.join("data/images/",file_id + ".jpg")
 
             # If using YOLO, run image through YOLO and save image with bounding boxes and JSON file with confidences
-            csv_to_json_file_path, csv_to_marked_image_file_path = '',''
             if self.yolo is not None:
-                csv_to_json_file_path, csv_to_marked_image_file_path = self.run_yolo(filename,file_id)
+                confidence_json_paths[i], marked_image_paths[i] = self.run_yolo(filename,file_id)
             
-            # Format data for writing to CSV
-            lon = ''
-            lat = ''
-            if status.coordinates is not None:
-                lon = status.coordinates["coordinates"][0]
-                lat = status.coordinates["coordinates"][1]
-            place_full_name = ''
-            place_type = ''
-            place_id = ''
-            place_url = ''
-            if status.place is not None:
-                place_full_name = status.place.full_name
-                place_type = status.place.place_type
-                place_id = status.place.id
-                place_url = status.place.url
+        # Format data for writing to CSV
+        lon = ''
+        lat = ''
+        if status.coordinates is not None:
+            lon = status.coordinates["coordinates"][0]
+            lat = status.coordinates["coordinates"][1]
+        place_full_name = ''
+        place_type = ''
+        place_id = ''
+        place_url = ''
+        if status.place is not None:
+            place_full_name = status.place.full_name
+            place_type = status.place.place_type
+            place_id = status.place.id
+            place_url = status.place.url
 
-            # Get full text of tweet (deals with truncation)
-            text = ''
-            try:
-                if hasattr(status, 'extended_tweet'):
-                   text = status.extended_tweet['full_text']
-                else:
-                    text = status.text
-            except AttributeError:
-                print('attribute error: ' + status.text)
+        # Get full text of tweet (deals with truncation)
+        text = ''
+        try:
+            if hasattr(status, 'extended_tweet'):
+               text = status.extended_tweet['full_text']
+            else:
+                text = status.text
+        except AttributeError:
+            print('attribute error: ' + status.text)
 
-            # Write to CSV
-            try:
-                csv_lock.acquire()
-                with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
-                    writer = csv.writer(f)
-                    writer.writerow([status.user.id_str,status.id_str,text,csv_to_image_file_path,
-                                csv_to_marked_image_file_path,csv_to_json_file_path,status.created_at,
-                                status.source,status.truncated,status.in_reply_to_status_id_str,status.in_reply_to_user_id_str,
-                                status.in_reply_to_screen_name,lon,lat,place_full_name,
-                                place_type,place_id,place_url,status.quote_count,status.reply_count,
-                                status.retweet_count,status.favorite_count,status.lang])
-                csv_lock.release()
-                return True # Succesfully processed tweet
-            except OSError:
-                print(str(OSError) + "Error writing to CSV")
-                print("On tweet " +str(self.cnt))
-                return False 
+        # Write to CSV
+        try:
+            csv_lock.acquire()
+            with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
+                writer = csv.writer(f)
+                writer.writerow([status.user.id_str,status.id_str,text] + image_paths + marked_image_paths + confidence_json_paths +
+                            [status.source,status.truncated,status.in_reply_to_status_id_str,status.in_reply_to_user_id_str,
+                            status.in_reply_to_screen_name,lon,lat,place_full_name,
+                            place_type,place_id,place_url,status.quote_count,status.reply_count,
+                            status.retweet_count,status.favorite_count,status.lang])
+            csv_lock.release()
+            return True # Succesfully processed tweet
+        except OSError:
+            print(str(OSError) + "Error writing to CSV")
+            print("On tweet " +str(self.cnt))
+            return False 
 
     def run_yolo(self, filename, file_id):
         '''
@@ -307,7 +311,10 @@ def stream_scrape(dir_prefix,tracking,limit,yolo):
         with open(filename, 'a+') as f:
             writer = csv.writer(f)
             if os.path.getsize(filename) == 0:
-                writer.writerow(['user_id', 'tweet_id', 'text','image_file','marked_up_image_file','csv_to_json_file_path',
+                writer.writerow(['user_id', 'tweet_id', 'text',
+                    'image_file_0','image_file_1','image_file_2','image_file_3',
+                    'marked_up_image_file_0','marked_up_image_file_1','marked_up_image_file_2','marked_up_image_file_3',
+                    'csv_to_json_file_path_0','csv_to_json_file_path_1','csv_to_json_file_path_2','csv_to_json_file_path_3',
                     'created_at','source','truncated','in_reply_to_status_id',
                     'in_reply_to_user_id','in_reply_to_screen_name','longitude','latitude',
                     'place_full_name','place_type','place_id','place_url','quote_count',
@@ -371,12 +378,15 @@ def get_media_urls(tweet):
     """
     Returns the set of media urls for a given tweet
     """
-    media_urls = set()
-    media = tweet.entities.get('media', [])
+    try:
+        media = tweet.extended_entities.get('media', [])
+    except AttributeError as e:
+        return [], 0
+    media_urls = []
     cnt = 0
     if len(media) > 0:
         for i in range(0, len(media)):
             if media[i]['type'] == 'photo':
-                media_urls.add(media[i]['media_url'])
+                media_urls.append(media[i]['media_url'])
                 cnt = cnt + 1
     return media_urls, cnt
