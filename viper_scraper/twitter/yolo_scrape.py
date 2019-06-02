@@ -14,6 +14,7 @@ import _thread
 from . import scraper as twitter_scraper
 
 MAX_QUEUE_SIZE = 10000
+PROGRESS_UPDATE_FREQ = 25      # Print a progress update every PROGRESS_UPDATE_FREQ tweets/images
 
 # TODO: Go through code and change all the previous self.LABELS etc to self.yolo.LABELS... ugh
 class Yolo:
@@ -52,11 +53,21 @@ class YoloStreamListener(tweepy.StreamListener):
     """
     Listen for data
     """
-    def __init__(self,directory,yolo=None,api=None,limit=1000):
+    def __init__(self,directory,yolo=None,api=None,limit=1000,photos_as_limit=False):
+        '''
+        Directory       - Directory to save data to
+        yolo            - yolo config
+        api             - Twitter API
+        limit           - Max number to download
+        photos_as_limit - True if limit refers to number of images to download. False if limit refers to number of tweets to download  
+        '''
+        
         super().__init__(api)
         # TODO: Allow user to specify if they want to limit by number of tweets or number of photos (and time?)
 
         self.limit = limit
+        self.photos_as_limit = photos_as_limit
+
         self.stop_flag = False
 
         self.yolo = yolo
@@ -65,7 +76,7 @@ class YoloStreamListener(tweepy.StreamListener):
         num_worker_threads = 8
         self.threads = []
         for i in range(num_worker_threads):
-            t = TweetConsumerThread(directory,limit,self.yolo)
+            t = TweetConsumerThread(directory,limit,self.yolo,self.photos_as_limit)
             t.daemon = True
             t.start()
             self.threads.append(t)
@@ -104,10 +115,11 @@ class YoloStreamListener(tweepy.StreamListener):
         return False
 
 class TweetConsumerThread(threading.Thread):
-    def __init__(self,directory,limit,yolo=None):
+    def __init__(self,directory,limit,yolo=None,photos_as_limit=False):
         super().__init__()
         self.directory = directory
         self.limit = limit
+        self.photos_as_limit=photos_as_limit
         self.yolo = yolo
         if yolo is not None:
             self.net = cv2.dnn.readNetFromDarknet(self.yolo.config_path,self.yolo.weights_path)
@@ -117,11 +129,7 @@ class TweetConsumerThread(threading.Thread):
             tweet = q.get() # blocks until queue has an item in it
             if tweet is None: # Producer has indicated we are done
                 break
-            if self.process_tweet(tweet): # if an image was downloaded
-                curr_cnt = cnt.increment()
-                if curr_cnt % 25 is 0:
-                    print(str(curr_cnt) + " tweets downloaded")
-                    print(str(q.qsize()) + " tweets in queue")
+            self.process_tweet(tweet)
             q.task_done()
 
     def process_tweet(self, status):
@@ -140,22 +148,19 @@ class TweetConsumerThread(threading.Thread):
         #       Will also probably now return -1/0/1/2/3/4 now instead for counting pics... 
         # TODO: This will require a rework of tracking_generation.py - probably just is_above_threshold
         #       Which now will check all photos in a tweet, and obviously how we read those confidences in
-        media_urls, _ = get_media_urls(status)
-        if len(media_urls) == 0:
-            return False # No images to download
+        media_urls = get_media_urls(status)
 
         image_paths = ['' for i in range (4)]
         marked_image_paths = ['' for i in range (4)]
         confidence_json_paths = ['' for i in range (4)]
 
-        csv_to_image_file_path = ''
         for i, url in enumerate(media_urls):
             # Download image with unique filename - this ID is used for json and marked image as well
             file_id = uuid.uuid4().hex
             filename = os.path.join(self.directory,'data/images/', file_id + ".jpg")
             try:
                 urllib.request.urlretrieve(url, filename)
-            except Exception as e:
+            except Exception as e: #TODO should catch more specific error
                 print(e)     # likely HTTP error - user deleted image etc
                 return False # skip this tweet
 
@@ -164,6 +169,12 @@ class TweetConsumerThread(threading.Thread):
             # If using YOLO, run image through YOLO and save image with bounding boxes and JSON file with confidences
             if self.yolo is not None:
                 confidence_json_paths[i], marked_image_paths[i] = self.run_yolo(filename,file_id)
+
+            if self.photos_as_limit:
+                curr_cnt = cnt.increment()
+                if curr_cnt % PROGRESS_UPDATE_FREQ is 0:
+                    print(str(curr_cnt) + " images downloaded")
+                    print(str(q.qsize()) + " tweets in queue")
             
         # Format data for writing to CSV
         lon = ''
@@ -202,6 +213,13 @@ class TweetConsumerThread(threading.Thread):
                             place_type,place_id,place_url,status.quote_count,status.reply_count,
                             status.retweet_count,status.favorite_count,status.lang])
             csv_lock.release()
+
+            if not self.photos_as_limit:
+                curr_cnt = cnt.increment()
+                if curr_cnt % PROGRESS_UPDATE_FREQ is 0:
+                    print(str(curr_cnt) + " tweets downloaded")
+                    print(str(q.qsize()) + " tweets in queue")
+
             return True # Succesfully processed tweet
         except OSError:
             print(str(OSError) + "Error writing to CSV")
@@ -285,7 +303,7 @@ class TweetConsumerThread(threading.Thread):
 
         return csv_to_json_file_path, csv_to_marked_image_file_path
 
-def stream_scrape(dir_prefix,tracking,limit,yolo):
+def stream_scrape(dir_prefix,tracking,limit,yolo,photos_as_limit=False):
     api = get_api()
 
     if not os.path.exists(dir_prefix):
@@ -322,7 +340,7 @@ def stream_scrape(dir_prefix,tracking,limit,yolo):
     except OSError:
         print("Could not create data.csv")
 
-    stream_listener = YoloStreamListener(directory=twitter_dir,limit=limit,yolo=yolo)
+    stream_listener = YoloStreamListener(directory=twitter_dir,limit=limit,yolo=yolo,photos_as_limit=photos_as_limit)
 
     print("Starting stream...")
 
@@ -381,12 +399,10 @@ def get_media_urls(tweet):
     try:
         media = tweet.extended_entities.get('media', [])
     except AttributeError as e:
-        return [], 0
+        return []
     media_urls = []
-    cnt = 0
     if len(media) > 0:
         for i in range(0, len(media)):
             if media[i]['type'] == 'photo':
                 media_urls.append(media[i]['media_url'])
-                cnt = cnt + 1
-    return media_urls, cnt
+    return media_urls

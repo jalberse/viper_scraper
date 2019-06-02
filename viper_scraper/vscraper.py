@@ -29,13 +29,45 @@ def main():
                         default='metadata/tracking.txt',
                         help="Path to a text file containing a list of phrases, one per line, to track." +
                         " see https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html")
-    parser_twit.add_argument('-n', '--number', type=int, default=DEFAULT_NUMBER,
-                        dest='number', metavar='Number',
-                        help="If photos as limit is true, the number of images to "
-                        + "scrape. Else the number of posts to scrape.")
+    parser_twit.add_argument('-l', '--limit', type=int, default=DEFAULT_NUMBER,
+                        dest='limit', metavar='Limit',
+                        help="If photos as limit is true, the approximate number of images to "
+                        + "scrape. Else the approximate number of posts to scrape.")
+    parser_twit.add_argument('--photos_as_limit', action='store_true',
+                            help='Number refers to the number of images to scrape rather than number of tweets')
     
     
     parser_twit.set_defaults(func=twitter)
+
+    # YOLO parsing
+    parser_yolo = subparsers.add_parser('yolo',
+                        help= 'Use YOLO to scrape images from Twitter')
+    parser_yolo.add_argument('-d', '--dir_prefix', type=str,metavar="Data Directory",
+                        default='./data/', help='directory to save results')
+    parser_yolo.add_argument('-t', '--tracking', dest='tracking_file', metavar='Tracking File',
+                        default='metadata/tracking.txt',
+                        help="Path to a text file containing a list of phrases, one per line, to track." +
+                        " YOLO is applied to tweets from the resultant stream." +
+                        " see https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html")
+    parser_yolo.add_argument('-l', '--limit', type=int, default=DEFAULT_NUMBER,
+                        dest='limit', metavar='Limit',
+                        help="If photos as limit is true, the approximate number of images to "
+                        + "scrape. Else the approximate number of posts to scrape.")
+    parser_yolo.add_argument('--photos_as_limit', action='store_true',
+                            help='Number refers to the number of images to scrape rather than number of tweets')
+    # now params for actual YOLO model
+    parser_yolo.add_argument('--names', required=True,
+                        help="path to names file")
+    parser_yolo.add_argument('--config', required=True,
+                        help="path to config file")
+    parser_yolo.add_argument('--weights', required=True,
+                        help="path to weights file")
+    parser_yolo.add_argument('-c','--confidence',type=float,default=0.5,
+                        help="minimum probability to filter weak detections")
+    parser_yolo.add_argument('-th','--threshold', type=float,default=0.3,
+                        help="threshold when applying non-maxima suppression")
+
+    parser_yolo.set_defaults(func=yolo)
 
     # Instagram parsing
     parser_insta = subparsers.add_parser('instagram', 
@@ -59,32 +91,7 @@ def main():
                         help='path to Firefox installation')
     parser_insta.set_defaults(func=instagram)
 
-    # YOLO parsing
-    parser_yolo = subparsers.add_parser('yolo',
-                        help= 'Use YOLO to scrape images from Twitter')
-    parser_yolo.add_argument('-d', '--dir_prefix', type=str,metavar="Data Directory",
-                        default='./data/', help='directory to save results')
-    parser_yolo.add_argument('-t', '--tracking', dest='tracking_file', metavar='Tracking File',
-                        default='metadata/tracking.txt',
-                        help="Path to a text file containing a list of phrases, one per line, to track." +
-                        " YOLO is applied to tweets from the resultant stream." +
-                        " see https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html")
-    parser_yolo.add_argument('-n', '--number', type=int, default=0,
-                        help='Approximate number of images to download')
-    # now params for actual YOLO model
-    parser_yolo.add_argument('--names', required=True,
-                        help="path to names file")
-    parser_yolo.add_argument('--config', required=True,
-                        help="path to config file")
-    parser_yolo.add_argument('--weights', required=True,
-                        help="path to weights file")
-    parser_yolo.add_argument('-c','--confidence',type=float,default=0.5,
-                        help="minimum probability to filter weak detections")
-    parser_yolo.add_argument('-th','--threshold', type=float,default=0.3,
-                        help="threshold when applying non-maxima suppression")
-
-    parser_yolo.set_defaults(func=yolo)
-
+    
     args = parser.parse_args()
     args.func(args)
 
@@ -100,7 +107,7 @@ def instagram(args):
 def twitter(args):
     # Scrape twitter w/out YOLO
     tracking = get_tracking(args.tracking_file)
-    yolo_scraper.stream_scrape(dir_prefix=args.data_directory,tracking=tracking,limit=args.number,yolo=None)
+    yolo_scraper.stream_scrape(dir_prefix=args.data_directory,tracking=tracking,limit=args.limit,yolo=None,photos_as_limit=args.photos_as_limit)
 
 
 def yolo(args):
@@ -112,7 +119,7 @@ def yolo(args):
                                     confidence=args.confidence,
                                     threshold=args.threshold)
 
-    yolo_scraper.stream_scrape(dir_prefix=args.dir_prefix,tracking=tracking,limit=args.number,yolo=yolo_config)
+    yolo_scraper.stream_scrape(dir_prefix=args.dir_prefix,tracking=tracking,limit=args.limit,yolo=yolo_config,photos_as_limit=args.photos_as_limit)
     
 def get_tracking(filename):
     try:
