@@ -1,7 +1,5 @@
 # Viper Scraper
 
-Scraping and ingesting multi-model data from online social networks
-
 ## Set-Up
 
 Before using any script, run `pipenv shell` to enter the virtual environment.
