@@ -28,13 +28,13 @@ def main():
     parser_twit.add_argument('-t', '--tracking', dest='tracking_file', metavar='Tracking File',
                         default='metadata/tracking.txt',
                         help="Path to a text file containing a list of phrases, one per line, to track." +
-                        " see https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html")
+                        " See https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html")
     parser_twit.add_argument('-l', '--limit', type=int, default=DEFAULT_NUMBER,
                         dest='limit', metavar='Limit',
                         help="If photos as limit is true, the approximate number of images to "
-                        + "scrape. Else the approximate number of posts to scrape.")
+                        + "scrape. Else the approximate number of tweets to scrape.")
     parser_twit.add_argument('--photos_as_limit', action='store_true',
-                            help='Number refers to the number of images to scrape rather than number of tweets')
+                            help='If present, Limit refers to the number of images to scrape rather than number of tweets')
     
     
     parser_twit.set_defaults(func=twitter)

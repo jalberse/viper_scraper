@@ -2,56 +2,56 @@
 
 Scraping and ingesting multi-model data from online social networks
 
-## Use
+## Set-Up
 
 Before using any script, run `pipenv shell` to enter the virtual environment.
 
-### Scraping Twitter
+Using the Twitter scraper requires registering as a Twitter developer and providing authentication keys. Place your keys in either *.my_keys* (in .gitignore) or *config/keys.json*. See the [Twitter Developer page](https://developer.twitter.com/).
+
+## Scraping Twitter
 
 ```
-python viper_scraper.py twitter ...
+viper_scraper.py twitter [-h] [-d Data Directory] [-t Tracking File] 
+                         [-l Limit] [--photos_as_limit]
 ```
 
-Using the Twitter scraper requires registering as a Twitter developer and providing authentication keys. Place your keys in either *.my_keys* (in .gitignore) or *config/keys.json*
+`-d Data Directory` : Directory to save results to
 
-```
-python viper_scraper.py twitter [-h] [-n Number] [-t Tracking File] [-d Directory Prefix] [--photo_limit] [--status_limit]
-```
+`-t Tracking File` : Path to a text file containing a list of phrases, one
+                    per line, to track. See the Twitter page for [filteringrealtime tweets](https://developer.twitter.com/en/docstweets/filter-realtime/guidesbasic-stream-parameters.html).
 
-`-n Number` : The number of tweets (--status_limit flag) or images (--photo_limit flag, default) to scrape. Script will terminate when this number is reached.
 
-`-t Tracking File` : The path to the tracking file. This file contains a list of phrases, one per line, used to filter the Twitter stream. See [Filter realtime Tweets](https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html) for more information or see config/plane_tracking.txt for an example.
+`-l Limit` : If photos as limit is true, the approximate number of
+                        images to scrape. Else the approximate number of tweets
+                        to scrape.
 
-`-d Directory Prefix` : The directory to save data to.
+`--photos_as_limit` : If present, Limit refers to the number of images to scrape                        rather than number of tweets
 
 The Twitter scraper filters realtime tweets using the [Twitter API](https://developer.twitter.com/en/docs.html). Text, metadata, and references to donwloaded images are stored in data.csv under the specified directory.
 
-### YOLO integration with Twitter
+#### YOLO integration with Twitter
 
 ```
 python viper_scraper.py yolo ...
 ```
 
-The VIPER scraper also integrates [YOLO](https://pjreddie.com/darknet/yolo/) (You Only Look Once) real-time object detection.
+The VIPER scraper also integrates You Only Look Once ([YOLO](https://pjreddie.com/darknet/yolo/)) real-time object detection.
 
 For each tweet that passes the filter, the scraper will:
 
-1. Download the original image
+1. Download the original image, if present.
 2. Save a version of the image with bounding boxes and predictions labelled
 3. Save a .json file containing the confidences for each class
 4. Save text and metadata, along with references to these files, in data.csv under the specified directory
 
-Note that unlike the basic Twitter scraper, this script only saves tweets containing images.
-
 ```
-python viper_scraper.py yolo [-h] [-d Data Directory] [-t Tracking File] [-n NUMBER] --names NAMES --config CONFIG --weights WEIGHTS [-c CONFIDENCE] [-th THRESHOLD]
+viper_scraper.py yolo [-h] [-d Data Directory] [-t Tracking File]
+                      [-l Limit] [--photos_as_limit] --names NAMES
+                      --config CONFIG --weights WEIGHTS [-c CONFIDENCE]
+                      [-th THRESHOLD]
 ```
 
-`-d Directory Prefix` : The directory to save data to.
-
-`-t Tracking File` : The path to the tracking file. This file contains a list of phrases, one per line, used to filter the Twitter stream. See [Filter realtime Tweets](https://developer.twitter.com/en/docs/tweets/filter-realtime/guides/basic-stream-parameters.html) for more information or see config/plane_tracking.txt for an example.
-
-`-n NUMBER` : Approximate number of images to scrape (acts as a minimum, actual in range [n, n + maxqueuesize]. See yolo_scrape.py)
+In addition to the arguments shared by the basic Twitter scraper, YOLO integration takes these additional arguments:
 
 `--names NAMES` : A file containing the names, one per line, associated with the weights and config file for YOLO, e.g. [coco.names](https://github.com/pjreddie/darknet/blob/master/data/coco.names).
 
@@ -63,35 +63,19 @@ python viper_scraper.py yolo [-h] [-d Data Directory] [-t Tracking File] [-n NUM
 
 `-th THRESHOLD` : Threshold when applying non-maxima suppression, default 0.3.
 
-#### YOLO Example
-
 For example, to use the pretrained YOLO model ([coco.names](https://github.com/pjreddie/darknet/blob/master/data/coco.names), [yolov3.cfg](https://github.com/pjreddie/darknet/blob/master/cfg/yolov3.cfg), and [yolov3.weights](https://pjreddie.com/media/files/yolov3.weights)) with plane_tracking.txt, download the files and run:
 
 ```
-python viper_scraper.py yolo -d data_yolo_test -t config/plane_tracking.txt -n 1000 --names coco.names --config yolov3.cfg --weights yolov3.weights -c .5 -th .3
+python viper_scraper.py yolo -d data_yolo_planes -t config/plane_tracking.txt -l 1000 --names coco.names --config yolov3.cfg --weights yolov3.weights -c .5 -th .3
 ```
 
-### Tracking file generation
-
-```
-python utils/tracking_generator.py [CSV]
-```
-
-*This functionality is currently under development, see utils/tracking_generator.py*
-
-The tracking_generator.py script takes the CSV and data obtained by running `viper_scraper.py yolo` and generates a tracking file for future use. 
-
-For example, say that we are scraping for pictures of airplanes. We might start with a tracking file containing phrases such as "flying", "airplane", "travel", etc. The script partitions the resultant data into tweets which contain a picture of an airplane (YOLO detected at least one airplane above some confidence threshold) and those that do not. It takes the first partition and ranks phrases in the body of the tweets by TF-IDF score. The top n are placed into the new tracking file.
-
-The data obtained using the new tracking file will (hopefully) have a higher ratio and volume of pictures of airplanes, as the phrases are known to be associated with desirable photos.
-
-### Scraping Instagram
+## Scraping Instagram
 
 ```
 python viper_scraper.py instagram ...
 ```
 
-This script and associated utility scripts are based on Antonie Lin's non-API instagram scraper under the MIT license. Visit his repository at:
+This script and associated utility scripts are based on Antonie Lin's non-API instagram scraper under the MIT license. Visit his (now-archived) repository at:
 
 https://github.com/iammrhelo/InstagramCrawler
 
