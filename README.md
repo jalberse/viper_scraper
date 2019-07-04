@@ -25,7 +25,7 @@ viper_scraper.py twitter [-h] [-d Data Directory] [-t Tracking File]
 
 `--photos_as_limit` : If present, Limit refers to the number of images to scrape                        rather than number of tweets
 
-The Twitter scraper filters realtime tweets using the [Twitter API](https://developer.twitter.com/en/docs.html). Text, metadata, and references to donwloaded images are stored in data.csv under the specified directory.
+The Twitter scraper filters realtime tweets using the [Twitter API](https://developer.twitter.com/en/docs.html). Text, metadata, and references to downloaded images are stored in data.csv under the specified directory.
 
 #### YOLO integration with Twitter
 
