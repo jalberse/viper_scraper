@@ -16,7 +16,6 @@ from . import scraper as twitter_scraper
 MAX_QUEUE_SIZE = 10000
 PROGRESS_UPDATE_FREQ = 25      # Print a progress update every PROGRESS_UPDATE_FREQ tweets/images
 
-# TODO: Go through code and change all the previous self.LABELS etc to self.yolo.LABELS... ugh
 class Yolo:
     def __init__(self,names_path,weights_path,config_path,confidence,threshold):
         self.LABELS = open(names_path).read().strip().split("\n")
@@ -129,7 +128,13 @@ class TweetConsumerThread(threading.Thread):
             tweet = q.get() # blocks until queue has an item in it
             if tweet is None: # Producer has indicated we are done
                 break
-            self.process_tweet(tweet)
+            # TODO: Test this out and see what is done. Consider artificially introducing error
+            #       See if we can signal main thread to reset stream? Idk hmm
+            try:
+                self.process_tweet(tweet)
+            except Exception as e:
+                print("ERROR IN THREAD")
+                print(e)
             q.task_done()
 
     def process_tweet(self, status):
