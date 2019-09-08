@@ -64,7 +64,7 @@ In addition to the arguments shared by the basic Twitter scraper, YOLO integrati
 For example, to use the pretrained YOLO model ([coco.names](https://github.com/pjreddie/darknet/blob/master/data/coco.names), [yolov3.cfg](https://github.com/pjreddie/darknet/blob/master/cfg/yolov3.cfg), and [yolov3.weights](https://pjreddie.com/media/files/yolov3.weights)) with plane_tracking.txt, download the files and run:
 
 ```
-python viper_scraper.py yolo -d data_yolo_planes -t config/plane_tracking.txt -l 1000 --names coco.names --config yolov3.cfg --weights yolov3.weights -c .5 -th .3
+python viper_scraper.py yolo -d data_yolo_planes -t config/plane_tracking.txt -l 1000 --names yolo/coco.names --config yolo/yolov3.cfg --weights yolo/yolov3.weights -c .5 -th .3
 ```
 
 ## Scraping Instagram
