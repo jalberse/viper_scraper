@@ -210,7 +210,7 @@ class TweetConsumerThread(threading.Thread):
         # Write to CSV
         try:
             csv_lock.acquire()
-            with open(os.path.join(self.directory,'data.csv'), 'a+') as f:
+            with open(os.path.join(self.directory,'data.csv'), 'a+', encoding="utf8") as f:
                 writer = csv.writer(f)
                 writer.writerow([status.user.id_str,status.id_str,text] + image_paths + marked_image_paths + confidence_json_paths +
                             [status.source,status.truncated,status.in_reply_to_status_id_str,status.in_reply_to_user_id_str,
@@ -331,7 +331,7 @@ def stream_scrape(dir_prefix,tracking,limit,yolo,photos_as_limit=False):
     # CSV file - create and write header if necessary
     try:
         filename = os.path.join(twitter_dir,'data.csv')
-        with open(filename, 'a+') as f:
+        with open(filename, 'a+', encoding="utf8") as f:
             writer = csv.writer(f)
             if os.path.getsize(filename) == 0:
                 writer.writerow(['user_id', 'tweet_id', 'text',
